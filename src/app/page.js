@@ -1,103 +1,601 @@
-import Image from "next/image";
+"use client";
+
+import { useEffect, useRef, useState } from "react";
+import QRCodeStyling from "qr-code-styling";
+import { toJpeg } from "html-to-image";
+import {
+  FaInstagram,
+  FaFacebookF,
+  FaTiktok,
+  FaLinkedin,
+  FaDownload,
+  FaLink,
+  FaImage,
+  FaFilePdf,
+} from "react-icons/fa";
+import { HiColorSwatch } from "react-icons/hi";
+
+const socialBaseUrls = {
+  instagram: "https://instagram.com/",
+  facebook: "https://facebook.com/",
+  tiktok: "https://www.tiktok.com/@",
+  linkedin: "https://www.linkedin.com/in/",
+};
+
+const socialIcons = {
+  instagram: <FaInstagram size={22} className="text-purple-700" />,
+  facebook: <FaFacebookF size={22} className="text-blue-700" />,
+  tiktok: <FaTiktok size={22} className="text-gray-800" />,
+  linkedin: <FaLinkedin size={22} className="text-blue-800" />,
+};
+
+const typeIcons = {
+  link: <FaLink size={20} />,
+  social: <FaInstagram size={20} />,
+  image: <FaImage size={20} />,
+  pdf: <FaFilePdf size={20} />,
+};
+
+// Predefined color themes
+const colorThemes = [
+  { name: "Classic", fg: "#000000", bg: "#FFFFFF" },
+  { name: "Neon Blue", fg: "#0066FF", bg: "#F0F7FF" },
+  { name: "Forest", fg: "#2E7D32", bg: "#F1F8E9" },
+  { name: "Sunset", fg: "#FF5722", bg: "#FBE9E7" },
+  { name: "Royal Purple", fg: "#6A1B9A", bg: "#F3E5F5" },
+  { name: "Dark Mode", fg: "#FFFFFF", bg: "#121212" },
+];
+
+// Default placeholder QR code data
+const DEFAULT_QR_DATA = "https://example.com";
 
 export default function Home() {
-  return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm/6 text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-[family-name:var(--font-geist-mono)] font-semibold">
-              src/app/page.js
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
+  const qrRef = useRef(null);
+  const qrCode = useRef(null);
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
+  const [type, setType] = useState("link");
+  const [value, setValue] = useState("");
+  const [username, setUsername] = useState("");
+  const [fgColor, setFgColor] = useState("#4338CA"); // Indigo 700 as default
+  const [bgColor, setBgColor] = useState("#F5F7FF");
+  const [dotStyle, setDotStyle] = useState("dots");
+  const [eyeStyle, setEyeStyle] = useState("square");
+  const [selectedSocial, setSelectedSocial] = useState("instagram");
+  const [showCustomColors, setShowCustomColors] = useState(false);
+  const [isValid, setIsValid] = useState(false);
+  const [showInfo, setShowInfo] = useState(false);
+  // Responsiveness
+  // Aggiungi questi stati nel tuo componente principale
+  const [showColorThemes, setShowColorThemes] = useState(true);
+  const [showStyleOptions, setShowStyleOptions] = useState(true);
+
+  // Su mobile, potresti voler inizializzare con questi valori a false
+  // e mostrarli espansi solo su desktop
+  useEffect(() => {
+    const handleResize = () => {
+      const isMobile = window.innerWidth < 768;
+      if (isMobile) {
+        setShowColorThemes(false);
+        setShowStyleOptions(false);
+      } else {
+        setShowColorThemes(true);
+        setShowStyleOptions(true);
+      }
+    };
+
+    // Set initial state
+    handleResize();
+
+    // Add event listener
+    window.addEventListener("resize", handleResize);
+
+    // Cleanup
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
+  const getQRData = () => {
+    if (type === "social") {
+      return username
+        ? socialBaseUrls[selectedSocial] + username
+        : DEFAULT_QR_DATA;
+    }
+    return value || DEFAULT_QR_DATA;
+  };
+  ////
+
+  // Validate input
+  useEffect(() => {
+    if (type === "social") {
+      setIsValid(username.trim().length > 0);
+    } else {
+      // Simple validation for URLs
+      if (type === "link" || type === "image" || type === "pdf") {
+        const urlPattern =
+          /^(https?:\/\/)?([\da-z.-]+)\.([a-z.]{2,6})([\/\w.-]*)*\/?$/;
+        setIsValid(value && urlPattern.test(value));
+      } else {
+        setIsValid(value.trim().length > 0);
+      }
+    }
+  }, [value, username, type]);
+
+  // Initialize QR code
+  useEffect(() => {
+    qrCode.current = new QRCodeStyling({
+      width: 280,
+      height: 280,
+      type: "canvas",
+      data: DEFAULT_QR_DATA, // Show default QR code on load
+      image: "",
+      dotsOptions: {
+        color: fgColor,
+        type: dotStyle,
+      },
+      backgroundOptions: {
+        color: bgColor,
+      },
+      cornersSquareOptions: {
+        type: eyeStyle,
+        color: fgColor,
+      },
+      cornersDotOptions: {
+        type: eyeStyle,
+        color: fgColor,
+      },
+    });
+
+    qrCode.current.append(qrRef.current);
+  }, []);
+
+  // Update QR code on changes
+  useEffect(() => {
+    const data = getQRData();
+    if (qrCode.current) {
+      qrCode.current.update({
+        data: data,
+        dotsOptions: {
+          color: fgColor,
+          type: dotStyle,
+        },
+        backgroundOptions: {
+          color: bgColor,
+        },
+        cornersSquareOptions: {
+          type: eyeStyle,
+          color: fgColor,
+        },
+        cornersDotOptions: {
+          type: eyeStyle,
+          color: fgColor,
+        },
+      });
+    }
+  }, [
+    value,
+    username,
+    fgColor,
+    bgColor,
+    dotStyle,
+    eyeStyle,
+    selectedSocial,
+    type,
+  ]);
+
+  const downloadQR = () => {
+    // Cattura l'intero elemento con la cornice e il tag social
+    const qrContainer = document.getElementById("qr-container");
+
+    // Opzioni avanzate per risolvere il problema "font is undefined"
+    const options = {
+      quality: 1,
+      pixelRatio: 1, // Migliore qualità per il download
+      backgroundColor: "white",
+      // Gestione dei font per evitare l'errore "font is undefined"
+      fontEmbedCSS: null,
+      skipFonts: true,
+      // Ignora errori di caricamento per elementi esterni
+      onCloneNode: (node) => {
+        if (node.tagName && node.tagName === "CANVAS") {
+          // Clona direttamente i canvas per mantenere il loro contenuto
+          const canvas = node.cloneNode(false);
+          canvas.getContext("2d").drawImage(node, 0, 0);
+          return canvas;
+        }
+        return node;
+      },
+    };
+
+    // Utilizziamo html-to-image per catturare l'intero container
+    toJpeg(qrContainer, options)
+      .then((dataUrl) => {
+        // Crea un link per il download
+        const link = document.createElement("a");
+        link.download = "qr-code-completo.jpeg";
+        link.href = dataUrl;
+        link.click();
+      })
+      .catch((error) => {
+        console.error("Errore durante la generazione dell'immagine:", error);
+        alert("Errore durante la generazione dell'immagine");
+      });
+  };
+
+  const applyColorTheme = (theme) => {
+    setFgColor(theme.fg);
+    setBgColor(theme.bg);
+  };
+
+  const renderInputField = () => {
+    switch (type) {
+      case "social":
+        return (
+          <div className="space-y-3">
+            <div>
+              <label className="block text-sm font-medium text-gray-800 mb-1.5">
+                Social:
+              </label>
+              <div className="grid grid-cols-4 gap-2">
+                {Object.keys(socialBaseUrls).map((social) => (
+                  <button
+                    key={social}
+                    className={`p-2 rounded-lg flex flex-col items-center justify-center transition-all ${
+                      selectedSocial === social
+                        ? "bg-indigo-100 ring-1 ring-indigo-600 shadow-sm"
+                        : "bg-white hover:bg-gray-50 border border-gray-200 hover:border-indigo-300"
+                    }`}
+                    onClick={() => setSelectedSocial(social)}
+                  >
+                    {socialIcons[social]}
+                    <span
+                      className={`text-xs mt-1 capitalize font-medium ${selectedSocial === social ? "text-indigo-700" : "text-gray-700"}`}
+                    >
+                      {social}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-800 mb-1.5">
+                Username:
+              </label>
+              <div className="relative">
+                <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-indigo-600 text-base font-medium">
+                  @
+                </span>
+                <input
+                  type="text"
+                  className="w-full pl-7 p-2.5 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 bg-white shadow-sm text-gray-800"
+                  placeholder="mario.rossi"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                />
+              </div>
+            </div>
+          </div>
+        );
+      default:
+        return (
+          <div>
+            <label className="block text-sm font-medium text-gray-800 mb-1.5">
+              {type === "link"
+                ? "URL:"
+                : type === "image"
+                  ? "Immagine URL:"
+                  : type === "pdf"
+                    ? "PDF URL:"
+                    : "Valore:"}
+            </label>
+            <input
+              type="text"
+              className="w-full p-2.5 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 bg-white shadow-sm text-gray-800"
+              placeholder={
+                type === "link"
+                  ? "https://example.com"
+                  : type === "image"
+                    ? "https://example.com/image.jpg"
+                    : type === "pdf"
+                      ? "https://example.com/document.pdf"
+                      : ""
+              }
+              value={value}
+              onChange={(e) => setValue(e.target.value)}
             />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+          </div>
+        );
+    }
+  };
+
+  return (
+    <div className="min-h-screen p-2 md:p-6 bg-gradient-to-br from-indigo-50 to-purple-50">
+      <div className="max-w-5xl mx-auto">
+        {/* Header section with Century Gothic font */}
+        <div className="text-center mb-3 md:mb-5">
+          <h1 className="century-gothic text-3xl md:text-6xl font-bold mb-1 md:mb-3 text-indigo-600 tracking-wide px-2 py-1">
+            QRastic!
+          </h1>
+
+          <div className="flex justify-center items-center gap-2 text-xs md:text-base text-gray-700">
+            <p className="hidden md:block">
+              Crea codici QR personalizzati per link, social media, immagini e
+              documenti completamente gratuiti!
+            </p>
+            <p className="md:hidden">Crea QR code personalizzati gratis!</p>
+
+            {!showInfo && (
+              <button
+                onClick={() => setShowInfo(true)}
+                className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-indigo-100 text-indigo-800 hover:bg-indigo-200 font-bold text-xs"
+                aria-label="Mostra informazioni"
+              >
+                i
+              </button>
+            )}
+          </div>
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
+
+        {/* Info section */}
+        <div className="px-2 md:p-4">
+          {showInfo && (
+            <div className="relative bg-indigo-800 text-white p-3 md:p-5 rounded-xl shadow-md mb-4 md:mb-6 max-w-4xl mx-auto">
+              <button
+                onClick={() => setShowInfo(false)}
+                className="absolute top-2 right-2 text-indigo-200 hover:text-white text-2xl"
+                aria-label="Chiudi"
+              >
+                ×
+              </button>
+
+              <h2 className="text-lg md:text-2xl font-bold mb-1 md:mb-2">
+                QR Code di Qualità, Davvero Gratuiti
+              </h2>
+              <p className="text-xs md:text-sm mb-2 text-indigo-100">
+                Nessun costo nascosto, nessuna registrazione richiesta. Crea QR
+                code unici con i tuoi colori e stili preferiti.
+              </p>
+
+              <div className="grid grid-cols-3 gap-2 mt-2">
+                <div className="flex flex-col items-center text-center bg-indigo-700/50 p-2 rounded-lg">
+                  <span className="text-base md:text-lg mb-1">✨</span>
+                  <h3 className="font-bold text-xs">Gratuito</h3>
+                </div>
+                <div className="flex flex-col items-center text-center bg-indigo-700/50 p-2 rounded-lg">
+                  <span className="text-base md:text-lg mb-1">🎨</span>
+                  <h3 className="font-bold text-xs">Personalizzabile</h3>
+                </div>
+                <div className="flex flex-col items-center text-center bg-indigo-700/50 p-2 rounded-lg">
+                  <span className="text-base md:text-lg mb-1">📱</span>
+                  <h3 className="font-bold text-xs">Alta Qualità</h3>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Main content - Mobile layout as accordion, Desktop as grid */}
+        <div className="flex flex-col md:grid md:grid-cols-2 gap-3 md:gap-6">
+          {/* Controls section */}
+          <div className="bg-white p-3 md:p-6 rounded-xl shadow-md space-y-3 md:space-y-4 border border-gray-100">
+            {/* QR Type Selection */}
+            <div>
+              <label className="block text-sm font-medium text-gray-800 mb-1.5">
+                Tipo di QR:
+              </label>
+              <div className="grid grid-cols-4 gap-1 md:gap-2">
+                {Object.entries(typeIcons).map(([key, icon]) => (
+                  <button
+                    key={key}
+                    className={`p-2 rounded-lg flex flex-col items-center justify-center transition-all ${
+                      type === key
+                        ? "bg-indigo-100 ring-1 ring-indigo-600 shadow-sm"
+                        : "bg-white hover:bg-gray-50 border border-gray-200 hover:border-indigo-300"
+                    }`}
+                    onClick={() => {
+                      setType(key);
+                      setValue("");
+                      setUsername("");
+                    }}
+                  >
+                    <div
+                      className={`text-sm md:text-base ${type === key ? "text-indigo-700" : "text-gray-700"}`}
+                    >
+                      {icon}
+                    </div>
+                    <span
+                      className={`text-xs mt-1 capitalize font-medium ${type === key ? "text-indigo-700" : "text-gray-700"}`}
+                    >
+                      {key}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Input fields */}
+            {renderInputField()}
+
+            {/* Color Theme Accordion */}
+            <div className="border-t border-gray-200 pt-3">
+              <button
+                className="flex items-center justify-between w-full text-left font-medium text-gray-800 mb-2"
+                onClick={() => setShowColorThemes(!showColorThemes)}
+              >
+                <div className="flex items-center text-base md:text-lg">
+                  <HiColorSwatch className="mr-2 text-indigo-600" /> Tema Colori
+                </div>
+                <span>{showColorThemes ? "▲" : "▼"}</span>
+              </button>
+
+              {showColorThemes && (
+                <>
+                  <div className="grid grid-cols-3 gap-1 md:gap-2 mb-3">
+                    {colorThemes.slice(0, 6).map((theme, index) => (
+                      <button
+                        key={index}
+                        className="p-1.5 md:p-2 rounded-lg border border-gray-200 hover:border-indigo-400 hover:shadow-sm transition-all flex items-center"
+                        onClick={() => applyColorTheme(theme)}
+                      >
+                        <div
+                          className="w-4 h-4 md:w-6 md:h-6 rounded-full mr-1 md:mr-2 shadow-sm"
+                          style={{
+                            backgroundColor: theme.fg,
+                            border: `2px solid ${theme.bg}`,
+                          }}
+                        />
+                        <span className="text-xs font-medium text-gray-700 truncate">
+                          {theme.name}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+
+                  <div className="mt-2">
+                    <button
+                      className="text-indigo-700 font-medium flex items-center text-sm md:text-base hover:text-indigo-800 transition-colors"
+                      onClick={() => setShowCustomColors(!showCustomColors)}
+                    >
+                      {showCustomColors
+                        ? "↑ Nascondi colori"
+                        : "✨ Personalizza colori"}
+                    </button>
+
+                    {showCustomColors && (
+                      <div className="grid grid-cols-2 gap-2 mt-2 bg-indigo-50 p-2 rounded-lg">
+                        <div>
+                          <label className="block text-xs font-medium text-gray-800 mb-1">
+                            Colore QR:
+                          </label>
+                          <input
+                            type="color"
+                            className="w-full h-8 md:h-10 p-1 rounded-lg border shadow-sm"
+                            value={fgColor}
+                            onChange={(e) => setFgColor(e.target.value)}
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-gray-800 mb-1">
+                            Colore Sfondo:
+                          </label>
+                          <input
+                            type="color"
+                            className="w-full h-8 md:h-10 p-1 rounded-lg border shadow-sm"
+                            value={bgColor}
+                            onChange={(e) => setBgColor(e.target.value)}
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
+            </div>
+
+            {/* Style Options Accordion */}
+            <div className="border-t border-gray-200 pt-3">
+              <button
+                className="flex items-center justify-between w-full text-left font-medium text-gray-800 mb-2"
+                onClick={() => setShowStyleOptions(!showStyleOptions)}
+              >
+                <div className="flex items-center text-base md:text-lg">
+                  <span className="mr-2">🎨</span> Opzioni di Stile
+                </div>
+                <span>{showStyleOptions ? "▲" : "▼"}</span>
+              </button>
+
+              {showStyleOptions && (
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-800 mb-1">
+                      Stile Punti:
+                    </label>
+                    <select
+                      className="w-full p-1.5 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 bg-white shadow-sm text-gray-800 text-sm"
+                      value={dotStyle}
+                      onChange={(e) => setDotStyle(e.target.value)}
+                    >
+                      <option value="dots">Dots</option>
+                      <option value="rounded">Rounded</option>
+                      <option value="classy">Classy</option>
+                      <option value="classy-rounded">Classy Rounded</option>
+                      <option value="square">Square</option>
+                      <option value="extra-rounded">Extra Rounded</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-medium text-gray-800 mb-1">
+                      Stile Angoli:
+                    </label>
+                    <select
+                      className="w-full p-1.5 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 bg-white shadow-sm text-gray-800 text-sm"
+                      value={eyeStyle}
+                      onChange={(e) => setEyeStyle(e.target.value)}
+                    >
+                      <option value="square">Square</option>
+                      <option value="dot">Dot</option>
+                      <option value="extra-rounded">Extra Rounded</option>
+                    </select>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Preview and Download section */}
+          <div className="bg-white p-3 md:p-6 rounded-xl shadow-md flex flex-col items-center justify-center border border-gray-100">
+            <div
+              id="qr-container"
+              className="flex-1 flex flex-col items-center justify-center w-full"
+            >
+              <div
+                className={`transition-opacity duration-300 ${isValid ? "opacity-100" : "opacity-40"}`}
+              >
+                <div className="bg-gradient-to-r from-indigo-50 to-purple-50 p-3 md:p-5 rounded-xl shadow-inner">
+                  <div
+                    ref={qrRef}
+                    className="border-2 border-white rounded-lg p-2 md:p-3 shadow-md"
+                  />
+                </div>
+              </div>
+
+              {type === "social" && username && (
+                <div className="mt-2 mb-1 text-center flex items-center justify-center space-x-2 bg-indigo-50 px-4 py-1.5 rounded-full">
+                  {socialIcons[selectedSocial]}
+                  <span className="font-medium text-gray-800 text-sm md:text-base">
+                    @{username}
+                  </span>
+                </div>
+              )}
+              <p className="text-gray-500 text-xs mt-1">
+                Codice QR generato con QRastic!
+              </p>
+            </div>
+
+            <div className="w-full mt-3 md:mt-4">
+              <button
+                onClick={downloadQR}
+                disabled={!isValid}
+                className={`w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-lg shadow-md text-white font-medium text-base md:text-lg transition-all ${
+                  isValid
+                    ? "bg-indigo-700 hover:bg-indigo-800 hover:shadow-lg"
+                    : "bg-gray-300 cursor-not-allowed"
+                }`}
+              >
+                <FaDownload size={18} />
+                Scarica QR Code
+              </button>
+
+              {!isValid && (
+                <p className="text-orange-600 text-xs mt-1.5 text-center font-medium">
+                  {type === "social"
+                    ? "Inserisci un username per generare il QR code"
+                    : "Inserisci un URL valido per generare il QR code"}
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
