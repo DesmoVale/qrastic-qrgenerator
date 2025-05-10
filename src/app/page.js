@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import QRCodeStyling from "qr-code-styling";
-import { toJpeg, toPng } from "html-to-image";
+import { toJpeg } from "html-to-image";
 import {
   FaInstagram,
   FaFacebookF,
@@ -121,16 +121,12 @@ export default function Home() {
 
   // Initialize QR code
   useEffect(() => {
-    // Determina la dimensione appropriata in base alla viewport
-    const isMobile = window.innerWidth < 768;
-    const qrSize = isMobile ? 240 : 280; // Dimensione leggermente più piccola su mobile
-    const dpr = window.devicePixelRatio || 1;
-
     qrCode.current = new QRCodeStyling({
-      width: qrSize * dpr,
-      height: qrSize * dpr,
+      width: 280,
+      height: 280,
       type: "canvas",
-      data: DEFAULT_QR_DATA,
+      data: DEFAULT_QR_DATA, // Show default QR code on load
+      image: "",
       dotsOptions: {
         color: fgColor,
         type: dotStyle,
@@ -146,32 +142,9 @@ export default function Home() {
         type: eyeStyle,
         color: fgColor,
       },
-      // Aggiunta questa opzione per migliorare la qualità
-      qrOptions: {
-        errorCorrectionLevel: 'H', // Alta correzione degli errori per migliore qualità
-        typeNumber: 0, // Auto-detection
-      },
     });
-  
-    qrRef.current.style.width  = `${qrSize}px`;
-    qrRef.current.style.height = `${qrSize}px`;
+
     qrCode.current.append(qrRef.current);
-    
-    // Aggiungi un listener per ridimensionare il QR code quando cambia l'orientamento del dispositivo
-    const handleResize = () => {
-      const newIsMobile = window.innerWidth < 768;
-      const newSize = newIsMobile ? 240 : 280;
-      
-      if (qrCode.current) {
-        qrCode.current.update({
-          width: newSize,
-          height: newSize,
-        });
-      }
-    };
-    
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
   }, []);
 
   // Update QR code on changes
@@ -209,42 +182,35 @@ export default function Home() {
   ]);
 
   const downloadQR = () => {
+    // Cattura l'intero elemento con la cornice e il tag social
     const qrContainer = document.getElementById("qr-container");
-    
-    // Ottieni il devicePixelRatio corrente del dispositivo
-    const pixelRatio = window.devicePixelRatio || 1;
-    
-    // Opzioni avanzate con considerazione della densità pixel del dispositivo
+
+    // Opzioni avanzate per risolvere il problema "font is undefined"
     const options = {
-      quality: 1,              // Alta qualità per l'immagine JPEG
-      pixelRatio: pixelRatio, 
+      quality: 1,
+      pixelRatio: 1, // Migliore qualità per il download
       backgroundColor: "white",
-      // Gestione dei font
+      // Gestione dei font per evitare l'errore "font is undefined"
       fontEmbedCSS: null,
       skipFonts: true,
-      // Migliora la gestione dei canvas per mantenere la qualità
+      // Ignora errori di caricamento per elementi esterni
       onCloneNode: (node) => {
         if (node.tagName && node.tagName === "CANVAS") {
+          // Clona direttamente i canvas per mantenere il loro contenuto
           const canvas = node.cloneNode(false);
-          // Preserva le dimensioni originali del canvas moltiplicandole per il pixelRatio
-          canvas.width = node.width * pixelRatio;
-          canvas.height = node.height * pixelRatio;
-          const context = canvas.getContext("2d");
-          // Scala il contesto per rispettare il pixelRatio
-          context.scale(pixelRatio, pixelRatio);
-          context.drawImage(node, 0, 0);
+          canvas.getContext("2d").drawImage(node, 0, 0);
           return canvas;
         }
         return node;
       },
     };
-  
+
     // Utilizziamo html-to-image per catturare l'intero container
-    toPng(qrContainer, options)
+    toJpeg(qrContainer, options)
       .then((dataUrl) => {
         // Crea un link per il download
         const link = document.createElement("a");
-        link.download = "qrastic-code.png";
+        link.download = "qr-code-completo.jpeg";
         link.href = dataUrl;
         link.click();
       })
