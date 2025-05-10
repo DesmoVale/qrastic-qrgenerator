@@ -215,7 +215,7 @@ export default function Home() {
     // Opzioni avanzate con considerazione della densità pixel del dispositivo
     const options = {
       quality: 1,              // Alta qualità per l'immagine JPEG
-      pixelRatio: 2, // Usa almeno 2x o il pixelRatio del dispositivo se maggiore
+      pixelRatio: 1, // Usa almeno 2x o il pixelRatio del dispositivo se maggiore
       backgroundColor: "white",
       // Gestione dei font
       fontEmbedCSS: null,
@@ -242,7 +242,7 @@ export default function Home() {
       .then((dataUrl) => {
         // Crea un link per il download
         const link = document.createElement("a");
-        link.download = "qrastic-code.jpeg";
+        link.download = "qrastic-code.png";
         link.href = dataUrl;
         link.click();
       })
