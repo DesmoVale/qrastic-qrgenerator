@@ -193,7 +193,7 @@ export default function Home() {
     type,
   ]);
 
-// Funzione per scaricare il QR code come immagine ad alta risoluzione
+
 // Funzione per scaricare il QR code come immagine ad alta risoluzione
 const downloadQR = () => {
   const node = document.getElementById('qr-container');
@@ -228,27 +228,26 @@ const downloadQR = () => {
     /* Mantieni solo padding e background del container */
     #qr-export-clone {
       background: ${bgColor} !important;
-      padding: 20px !important;
+      padding: 0 !important;  // rimuovi padding extra non necessari
     }
   `;
   clone.prepend(resetStyles);
   document.body.appendChild(clone);
 
-  // 3) Calcola dimensioni con spazio extra per un framing equilibrato
-  const padding = 40;
-  const width  = 360;
-  const height = 720;
+  // 3) Imposta la dimensione finale dell'immagine (es. 1080x1080)
+  const exportWidth = 800;  // Impostato per una qualità alta
+  const exportHeight = 800; // Impostato per una qualità alta
 
-  // 4) Opzioni di esportazione per alta risoluzione
+  // 4) Imposta opzioni di esportazione per alta risoluzione
   const options = {
-    width: width,
-    height: height,
+    width: exportWidth,
+    height: exportHeight,
     style: {
       'background-color': bgColor,
-      'padding': `${padding}px`
+      'padding': '0px'  // Rimuove padding aggiuntivo
     },
-    pixelRatio: 8,   // risoluzione elevata
-    cacheBust: true  // forza reload di eventuali immagini esterne
+    pixelRatio: 20, // Aumentato per risoluzione molto alta
+    cacheBust: true  // Forza il reload delle immagini esterne
   };
 
   // 5) Genera il PNG e avvia il download
