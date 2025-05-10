@@ -2,7 +2,10 @@
 
 import { useEffect, useRef, useState } from "react";
 import QRCodeStyling from "qr-code-styling";
-import domtoimage from 'dom-to-image-more';
+import html2canvas from "html2canvas";
+import ReactDOMServer from "react-dom/server";
+
+import jsPDF from "jspdf";
 import {
   FaInstagram,
   FaFacebookF,
@@ -50,7 +53,6 @@ const colorThemes = [
 const DEFAULT_QR_DATA = "https://example.com";
 
 // Definizione dimensione di esportazione (maggiore per alta risoluzione)
-const EXPORT_SIZE = 1024;
 const DISPLAY_SIZE = 280;
 
 export default function Home() {
@@ -60,7 +62,7 @@ export default function Home() {
   const [type, setType] = useState("link");
   const [value, setValue] = useState("");
   const [username, setUsername] = useState("");
-  const [fgColor, setFgColor] = useState("#4338CA"); // Indigo 700 as default
+  const [fgColor, setFgColor] = useState("black"); // Indigo 700 as default
   const [bgColor, setBgColor] = useState("#F5F7FF");
   const [dotStyle, setDotStyle] = useState("dots");
   const [eyeStyle, setEyeStyle] = useState("square");
@@ -145,10 +147,10 @@ export default function Home() {
       },
       // Improve dot quality for better definition
       qrOptions: {
-        errorCorrectionLevel: 'H', // Highest error correction level
+        errorCorrectionLevel: "H", // Highest error correction level
         typeNumber: 0,
-        mode: 'Byte',
-      }
+        mode: "Byte",
+      },
     });
 
     qrCode.current.append(qrRef.current);
@@ -176,10 +178,10 @@ export default function Home() {
           color: fgColor,
         },
         qrOptions: {
-          errorCorrectionLevel: 'H',
+          errorCorrectionLevel: "H",
           typeNumber: 0,
-          mode: 'Byte',
-        }
+          mode: "Byte",
+        },
       });
     }
   }, [
@@ -193,72 +195,146 @@ export default function Home() {
     type,
   ]);
 
+  // Funzione per scaricare il QR code come immagine ad alta risoluzione
+  const downloadQR = async () => {
+    try {
+      const svgElement = qrRef.current.querySelector("svg");
+      if (!svgElement) {
+        console.error("SVG element not found");
+        return;
+      }
 
-// Funzione per scaricare il QR code come immagine ad alta risoluzione
-const downloadQR = async () => {
-  const node = document.getElementById("qr-container");
-  if (!node) return;
+      const svgClone = svgElement.cloneNode(true);
+      svgClone.setAttribute("width", "160");
+      svgClone.setAttribute("height", "160");
+      svgClone.setAttribute("xmlns", "http://www.w3.org/2000/svg");
+      const svgData = new XMLSerializer().serializeToString(svgClone);
 
-  // Clona il nodo per la cattura
-  const clone = node.cloneNode(true);
-  clone.id = "qr-export-clone";
-  Object.assign(clone.style, {
-    position: "absolute",
-    left: "-9999px",
-    top: "0",
-    width: "800px",
-    height: "800px",
-    backgroundColor: bgColor,
-  });
+      const canvas = document.createElement("canvas");
+      canvas.width = 1200;
+      canvas.height = 1500;
+      const ctx = canvas.getContext("2d");
 
-  // Rimuove elementi non desiderati come pulsanti
-  clone.querySelectorAll("button, .no-export").forEach((el) => el.remove());
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = bgColor;
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-  // Assicura che gli SVG siano renderizzati correttamente
-  const qrSvg = qrRef.current?.querySelector("svg");
-  if (qrSvg) {
-    const qrClone = qrSvg.cloneNode(true);
-    const exportContainer = clone.querySelector("#qr-ref") || clone;
-    exportContainer.innerHTML = ""; // Pulisce il vecchio contenuto
-    exportContainer.appendChild(qrClone);
-  }
+      const img = new Image();
+      img.src =
+        "data:image/svg+xml;base64," +
+        btoa(unescape(encodeURIComponent(svgData)));
 
-  // Appende il clone invisibile nel DOM
-  document.body.appendChild(clone);
+      await new Promise((resolve) => {
+        img.onload = async () => {
+          ctx.drawImage(img, (canvas.width - 900) / 2, 150, 900, 900);
 
-  const options = {
-    width: 1080,
-    height: 1080,
-    style: {
-      transform: "scale(1)",
-      transformOrigin: "top left",
-      backgroundColor: bgColor,
-    },
-    pixelRatio: 4,
-    cacheBust: true,
+          if (type === "social" && username) {
+            const tagY = 1200;
+            const iconSize = 100;
+
+            // Seleziona componente icona
+            const IconComponent = {
+              instagram: FaInstagram,
+              facebook: FaFacebookF,
+              linkedin: FaLinkedin,
+              tiktok: FaTiktok,
+            }[selectedSocial];
+
+            if (!IconComponent) {
+              console.warn("Icona non trovata per:", selectedSocial);
+              return;
+            }
+
+            // Renderizza l'icona React in HTML statico
+            const iconMarkup = ReactDOMServer.renderToStaticMarkup(
+              <div style={{ fontSize: `${iconSize}px`, color: fgColor }}>
+                <IconComponent />
+              </div>,
+            );
+
+            // Crea un container temporaneo fuori dallo schermo
+            const tempDiv = document.createElement("div");
+            tempDiv.style.position = "fixed";
+            tempDiv.style.top = "-1000px";
+            tempDiv.style.left = "-1000px";
+            tempDiv.style.width = "100px";
+            tempDiv.style.height = "100px";
+            tempDiv.style.display = "flex";
+            tempDiv.style.alignItems = "center";
+            tempDiv.style.justifyContent = "center";
+            tempDiv.style.background = "transparent";
+            tempDiv.style.color = fgColor;
+            tempDiv.innerHTML = iconMarkup;
+            document.body.appendChild(tempDiv);
+
+            try {
+              const iconCanvas = await html2canvas(tempDiv, {
+                backgroundColor: null,
+                scale: 2,
+                useCORS: true,
+              });
+
+              const iconImage = new Image();
+              iconImage.src = iconCanvas.toDataURL("image/png");
+
+              await new Promise((res) => {
+                iconImage.onload = () => {
+                  ctx.font = "bold 68px sans-serif";
+                  ctx.fillStyle = fgColor;
+                  ctx.textAlign = "left";
+                  ctx.textBaseline = "middle";
+
+                  const text = `@${username}`;
+                  const textWidth = ctx.measureText(text).width;
+                  const spacing = 20;
+                  const totalWidth = iconSize + spacing + textWidth;
+
+                  const iconX = (canvas.width - totalWidth) / 2;
+                  const iconY = tagY - iconSize / 2;
+                  ctx.drawImage(iconImage, iconX, iconY, iconSize, iconSize);
+
+                  // Testo centrato accanto all'icona
+                  ctx.fillText(text, iconX + iconSize + spacing, tagY);
+                  res();
+                };
+              });
+            } finally {
+              document.body.removeChild(tempDiv);
+            }
+          }
+
+          // Footer QRastic!
+          ctx.font = "40px sans-serif";
+          ctx.fillStyle = "#888888";
+          ctx.textAlign = "center";
+          ctx.textBaseline = "bottom";
+          ctx.fillText("QRastic!", canvas.width / 2, canvas.height - 30);
+
+          resolve();
+        };
+      });
+
+      const pngDataUrl = canvas.toDataURL("image/png");
+      const pdf = new jsPDF({
+        orientation: "portrait",
+        unit: "mm",
+        format: [100, 125],
+      });
+
+      const pdfWidth = 90;
+      const pdfHeight = 115;
+      const marginX = (100 - pdfWidth) / 2;
+      const marginY = (125 - pdfHeight) / 2;
+
+      pdf.addImage(pngDataUrl, "PNG", marginX, marginY, pdfWidth, pdfHeight);
+      pdf.save("qrastic-social.pdf");
+    } catch (err) {
+      console.error("Errore durante l'esportazione:", err);
+      alert("Si è verificato un errore durante la creazione del PDF.");
+    }
   };
 
-  try {
-    const dataUrl = await domtoimage.toPng(clone, options);
-    const link = document.createElement("a");
-    const fileName =
-      type === "social" ? `qrastic-${selectedSocial}-${username}` : "qrastic-code";
-    link.download = `${fileName}.png`;
-    link.href = dataUrl;
-    link.click();
-  } catch (err) {
-    console.error("Errore durante l'esportazione:", err);
-    alert("Errore durante la generazione dell'immagine. Riprova.");
-  } finally {
-    // Rimuove il nodo temporaneo dal DOM
-    document.body.removeChild(clone);
-  }
-};
-
-// ------ //
-
-
-
+  // ------ //
 
   const applyColorTheme = (theme) => {
     setFgColor(theme.fg);
@@ -347,15 +423,15 @@ const downloadQR = async () => {
   };
 
   return (
-    <div className="min-h-screen p-2 md:p-6 bg-gradient-to-br from-indigo-50 to-purple-50">
+    <div className="min-h-screen p-4 md:p-8 bg-white">
       <div className="max-w-5xl mx-auto">
-        {/* Header section with Century Gothic font */}
-        <div className="text-center mb-3 md:mb-5">
-          <h1 className="century-gothic text-3xl md:text-6xl font-bold mb-1 md:mb-3 text-indigo-600 tracking-wide px-2 py-1">
-            QRastic!
+        {/* Header section with clean typography */}
+        <div className="text-center mb-8">
+          <h1 className="text-4xl md:text-6xl font-bold mb-2 text-gray-900 tracking-tight px-3 py-2">
+            QRastic
           </h1>
 
-          <div className="flex justify-center items-center gap-2 text-xs md:text-base text-gray-700">
+          <div className="flex justify-center items-center gap-3 text-xs md:text-sm text-gray-600">
             <p className="hidden md:block">
               Crea codici QR personalizzati per link, social media, immagini e
               documenti completamente gratuiti!
@@ -365,7 +441,7 @@ const downloadQR = async () => {
             {!showInfo && (
               <button
                 onClick={() => setShowInfo(true)}
-                className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-indigo-100 text-indigo-800 hover:bg-indigo-200 font-bold text-xs"
+                className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-gray-100 text-gray-800 hover:bg-gray-200 font-semibold text-sm transition-all"
                 aria-label="Mostra informazioni"
               >
                 i
@@ -375,37 +451,37 @@ const downloadQR = async () => {
         </div>
 
         {/* Info section */}
-        <div className="px-2 md:p-4">
+        <div className="px-4 md:px-6">
           {showInfo && (
-            <div className="relative bg-indigo-800 text-white p-3 md:p-5 rounded-xl shadow-md mb-4 md:mb-6 max-w-4xl mx-auto">
+            <div className="relative bg-gray-100 text-gray-900 p-4 md:p-6 rounded-lg shadow-sm mb-6 max-w-4xl mx-auto">
               <button
                 onClick={() => setShowInfo(false)}
-                className="absolute top-2 right-2 text-indigo-200 hover:text-white text-2xl"
+                className="absolute top-2 right-2 text-gray-500 hover:text-gray-800 text-2xl"
                 aria-label="Chiudi"
               >
                 ×
               </button>
 
-              <h2 className="text-lg md:text-2xl font-bold mb-1 md:mb-2">
+              <h2 className="text-xl md:text-2xl font-semibold mb-2">
                 QR Code di Qualità, Davvero Gratuiti
               </h2>
-              <p className="text-xs md:text-sm mb-2 text-indigo-100">
+              <p className="text-sm mb-3 text-gray-700">
                 Nessun costo nascosto, nessuna registrazione richiesta. Crea QR
                 code unici con i tuoi colori e stili preferiti.
               </p>
 
-              <div className="grid grid-cols-3 gap-2 mt-2">
-                <div className="flex flex-col items-center text-center bg-indigo-700/50 p-2 rounded-lg">
-                  <span className="text-base md:text-lg mb-1">✨</span>
-                  <h3 className="font-bold text-xs">Gratuito</h3>
+              <div className="grid grid-cols-3 gap-3 mt-4">
+                <div className="flex flex-col items-center text-center bg-white p-3 rounded-lg shadow-sm">
+                  <span className="text-lg md:text-xl mb-2">✨</span>
+                  <h3 className="font-medium text-sm">Gratuito</h3>
                 </div>
-                <div className="flex flex-col items-center text-center bg-indigo-700/50 p-2 rounded-lg">
-                  <span className="text-base md:text-lg mb-1">🎨</span>
-                  <h3 className="font-bold text-xs">Personalizzabile</h3>
+                <div className="flex flex-col items-center text-center bg-white p-3 rounded-lg shadow-sm">
+                  <span className="text-lg md:text-xl mb-2">🎨</span>
+                  <h3 className="font-medium text-sm">Personalizzabile</h3>
                 </div>
-                <div className="flex flex-col items-center text-center bg-indigo-700/50 p-2 rounded-lg">
-                  <span className="text-base md:text-lg mb-1">📱</span>
-                  <h3 className="font-bold text-xs">Alta Qualità</h3>
+                <div className="flex flex-col items-center text-center bg-white p-3 rounded-lg shadow-sm">
+                  <span className="text-lg md:text-xl mb-2">📱</span>
+                  <h3 className="font-medium text-sm">Alta Qualità</h3>
                 </div>
               </div>
             </div>
@@ -413,22 +489,22 @@ const downloadQR = async () => {
         </div>
 
         {/* Main content - Mobile layout as accordion, Desktop as grid */}
-        <div className="flex flex-col md:grid md:grid-cols-2 gap-3 md:gap-6">
+        <div className="flex flex-col md:grid md:grid-cols-2 gap-6 md:gap-8">
           {/* Controls section */}
-          <div className="bg-white p-3 md:p-6 rounded-xl shadow-md space-y-3 md:space-y-4 border border-gray-100">
+          <div className="bg-gray-50 p-4 md:p-8 rounded-lg shadow-sm space-y-4">
             {/* QR Type Selection */}
             <div>
-              <label className="block text-sm font-medium text-gray-800 mb-1.5">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
                 Tipo di QR:
               </label>
-              <div className="grid grid-cols-4 gap-1 md:gap-2">
+              <div className="grid grid-cols-4 gap-3">
                 {Object.entries(typeIcons).map(([key, icon]) => (
                   <button
                     key={key}
-                    className={`p-2 rounded-lg flex flex-col items-center justify-center transition-all ${
+                    className={`p-3 rounded-lg flex flex-col items-center justify-center transition-all ${
                       type === key
-                        ? "bg-indigo-100 ring-1 ring-indigo-600 shadow-sm"
-                        : "bg-white hover:bg-gray-50 border border-gray-200 hover:border-indigo-300"
+                        ? "bg-blue-50 ring-1 ring-blue-500 shadow-sm"
+                        : "bg-white hover:bg-gray-50 border border-gray-200 hover:border-blue-300"
                     }`}
                     onClick={() => {
                       setType(key);
@@ -437,12 +513,12 @@ const downloadQR = async () => {
                     }}
                   >
                     <div
-                      className={`text-sm md:text-base ${type === key ? "text-indigo-700" : "text-gray-700"}`}
+                      className={`text-lg md:text-xl ${type === key ? "text-blue-600" : "text-gray-700"}`}
                     >
                       {icon}
                     </div>
                     <span
-                      className={`text-xs mt-1 capitalize font-medium ${type === key ? "text-indigo-700" : "text-gray-700"}`}
+                      className={`text-xs mt-2 font-medium ${type === key ? "text-blue-600" : "text-gray-700"}`}
                     >
                       {key}
                     </span>
@@ -455,28 +531,28 @@ const downloadQR = async () => {
             {renderInputField()}
 
             {/* Color Theme Accordion */}
-            <div className="border-t border-gray-200 pt-3">
+            <div className="border-t border-gray-200 pt-4">
               <button
-                className="flex items-center justify-between w-full text-left font-medium text-gray-800 mb-2"
+                className="flex items-center justify-between w-full text-left font-medium text-gray-800 mb-3"
                 onClick={() => setShowColorThemes(!showColorThemes)}
               >
-                <div className="flex items-center text-base md:text-lg">
-                  <HiColorSwatch className="mr-2 text-indigo-600" /> Tema Colori
+                <div className="flex items-center text-lg">
+                  <HiColorSwatch className="mr-3 text-blue-500" /> Tema Colori
                 </div>
                 <span>{showColorThemes ? "▲" : "▼"}</span>
               </button>
 
               {showColorThemes && (
                 <>
-                  <div className="grid grid-cols-3 gap-1 md:gap-2 mb-3">
+                  <div className="grid grid-cols-3 gap-3 mb-3">
                     {colorThemes.slice(0, 6).map((theme, index) => (
                       <button
                         key={index}
-                        className="p-1.5 md:p-2 rounded-lg border border-gray-200 hover:border-indigo-400 hover:shadow-sm transition-all flex items-center"
+                        className="p-2 rounded-lg border border-gray-200 hover:border-blue-300 hover:shadow-sm transition-all flex items-center"
                         onClick={() => applyColorTheme(theme)}
                       >
                         <div
-                          className="w-4 h-4 md:w-6 md:h-6 rounded-full mr-1 md:mr-2 shadow-sm"
+                          className="w-6 h-6 rounded-full mr-2 shadow-sm"
                           style={{
                             backgroundColor: theme.fg,
                             border: `2px solid ${theme.bg}`,
@@ -489,9 +565,9 @@ const downloadQR = async () => {
                     ))}
                   </div>
 
-                  <div className="mt-2">
+                  <div className="mt-3">
                     <button
-                      className="text-indigo-700 font-medium flex items-center text-sm md:text-base hover:text-indigo-800 transition-colors"
+                      className="text-blue-600 font-medium flex items-center text-sm md:text-base hover:text-blue-700 transition-colors"
                       onClick={() => setShowCustomColors(!showCustomColors)}
                     >
                       {showCustomColors
@@ -500,25 +576,25 @@ const downloadQR = async () => {
                     </button>
 
                     {showCustomColors && (
-                      <div className="grid grid-cols-2 gap-2 mt-2 bg-indigo-50 p-2 rounded-lg">
+                      <div className="grid grid-cols-2 gap-4 mt-3 bg-white p-3 rounded-lg shadow-sm">
                         <div>
-                          <label className="block text-xs font-medium text-gray-800 mb-1">
+                          <label className="block text-xs font-medium text-gray-700 mb-1">
                             Colore QR:
                           </label>
                           <input
                             type="color"
-                            className="w-full h-8 md:h-10 p-1 rounded-lg border shadow-sm"
+                            className="w-full h-10 p-2 rounded-lg border shadow-sm"
                             value={fgColor}
                             onChange={(e) => setFgColor(e.target.value)}
                           />
                         </div>
                         <div>
-                          <label className="block text-xs font-medium text-gray-800 mb-1">
+                          <label className="block text-xs font-medium text-gray-700 mb-1">
                             Colore Sfondo:
                           </label>
                           <input
                             type="color"
-                            className="w-full h-8 md:h-10 p-1 rounded-lg border shadow-sm"
+                            className="w-full h-10 p-2 rounded-lg border shadow-sm"
                             value={bgColor}
                             onChange={(e) => setBgColor(e.target.value)}
                           />
@@ -531,25 +607,25 @@ const downloadQR = async () => {
             </div>
 
             {/* Style Options Accordion */}
-            <div className="border-t border-gray-200 pt-3">
+            <div className="border-t border-gray-200 pt-4">
               <button
-                className="flex items-center justify-between w-full text-left font-medium text-gray-800 mb-2"
+                className="flex items-center justify-between w-full text-left font-medium text-gray-800 mb-3"
                 onClick={() => setShowStyleOptions(!showStyleOptions)}
               >
-                <div className="flex items-center text-base md:text-lg">
-                  <span className="mr-2">🎨</span> Opzioni di Stile
+                <div className="flex items-center text-lg">
+                  <span className="mr-3">🎨</span> Opzioni di Stile
                 </div>
                 <span>{showStyleOptions ? "▲" : "▼"}</span>
               </button>
 
               {showStyleOptions && (
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-xs font-medium text-gray-800 mb-1">
+                    <label className="block text-xs font-medium text-gray-700 mb-1">
                       Stile Punti:
                     </label>
                     <select
-                      className="w-full p-1.5 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 bg-white shadow-sm text-gray-800 text-sm"
+                      className="w-full p-2 border border-gray-200 rounded-lg focus:ring-blue-500 focus:border-blue-500 bg-white shadow-sm text-sm text-gray-800"
                       value={dotStyle}
                       onChange={(e) => setDotStyle(e.target.value)}
                     >
@@ -563,11 +639,11 @@ const downloadQR = async () => {
                   </div>
 
                   <div>
-                    <label className="block text-xs font-medium text-gray-800 mb-1">
+                    <label className="block text-xs font-medium text-gray-700 mb-1">
                       Stile Angoli:
                     </label>
                     <select
-                      className="w-full p-1.5 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 bg-white shadow-sm text-gray-800 text-sm"
+                      className="w-full p-2 border border-gray-200 rounded-lg focus:ring-blue-500 focus:border-blue-500 bg-white shadow-sm text-sm text-gray-800"
                       value={eyeStyle}
                       onChange={(e) => setEyeStyle(e.target.value)}
                     >
@@ -582,7 +658,7 @@ const downloadQR = async () => {
           </div>
 
           {/* Preview and Download section */}
-          <div className="bg-white p-3 md:p-6 rounded-xl shadow-md flex flex-col items-center justify-center border border-gray-100">
+          <div className="bg-gray-50 p-4 md:p-8 rounded-lg shadow-sm flex flex-col items-center justify-center">
             <div
               id="qr-container"
               className="flex-1 flex flex-col items-center justify-center w-full"
@@ -590,43 +666,43 @@ const downloadQR = async () => {
               <div
                 className={`transition-opacity duration-300 ${isValid ? "opacity-100" : "opacity-40"}`}
               >
-                <div className="bg-gradient-to-r from-indigo-50 to-purple-50 p-3 md:p-5 rounded-xl shadow-inner">
+                <div className="bg-white p-4 md:p-6 rounded-lg shadow-sm">
                   <div
                     ref={qrRef}
-                    className="border-2 border-white rounded-lg p-2 md:p-3 shadow-md"
+                    className="border border-gray-100 rounded-lg p-3 md:p-4 shadow-sm"
                   />
                 </div>
               </div>
 
               {type === "social" && username && (
-                <div className="mt-2 mb-1 text-center flex items-center justify-center space-x-2 bg-indigo-50 px-4 py-1.5 rounded-full">
+                <div className="mt-3 mb-2 text-center flex items-center justify-center space-x-3 bg-gray-100 px-6 py-2 rounded-full">
                   {socialIcons[selectedSocial]}
-                  <span className="font-medium text-gray-800 text-sm md:text-base">
+                  <span className="font-medium text-gray-800 text-sm md:text-lg">
                     @{username}
                   </span>
                 </div>
               )}
-              <p className="text-gray-500 text-xs mt-1 font-sans">
-                Codice QR generato con QRastic!
+              <p className="text-gray-400 text-xs mt-1 font-sans">
+                Codice QR generato con QRastic
               </p>
             </div>
 
-            <div className="w-full mt-3 md:mt-4">
+            <div className="w-full mt-4">
               <button
                 onClick={downloadQR}
                 disabled={!isValid}
-                className={`w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-lg shadow-md text-white font-medium text-base md:text-lg transition-all ${
+                className={`w-full flex items-center justify-center gap-3 py-3 px-6 rounded-lg shadow-sm text-white font-medium text-lg transition-all ${
                   isValid
-                    ? "bg-indigo-700 hover:bg-indigo-800 hover:shadow-lg"
+                    ? "bg-blue-600 hover:bg-blue-700 hover:shadow-md"
                     : "bg-gray-300 cursor-not-allowed"
                 }`}
               >
-                <FaDownload size={18} />
-                Scarica QR Code SVG
+                <FaDownload size={20} />
+                Scarica QR Code PDF
               </button>
 
               {!isValid && (
-                <p className="text-orange-600 text-xs mt-1.5 text-center font-medium">
+                <p className="text-red-500 text-xs mt-2 text-center font-medium">
                   {type === "social"
                     ? "Inserisci un username per generare il QR code"
                     : "Inserisci un URL valido per generare il QR code"}
