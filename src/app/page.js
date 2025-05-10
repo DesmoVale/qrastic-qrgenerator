@@ -204,14 +204,14 @@ export default function Home() {
         return;
       }
   
-      // Determina la scala appropriata basata sul dispositivo, ma limita per controllo dimensioni
-      // Usiamo 1.5 per iOS (non 2 come prima) per bilanciare qualità e dimensione
+      // Determina la scala appropriata basata sul dispositivo, con valori migliorati per la qualità
+      // Usiamo 2 per iOS e 1.5 per altri dispositivi per una migliore qualità
       const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
-      const pixelRatio = Math.min(isIOS ? 1.5 : 1, window.devicePixelRatio || 1);
+      const pixelRatio = Math.min(isIOS ? 2 : 1.5, window.devicePixelRatio || 1.5);
       
-      // Dimensioni ottimizzate per il canvas PDF
-      const canvasWidth = 600; // Ridotto da 1200
-      const canvasHeight = 750; // Ridotto da 1500
+      // Dimensioni leggermente aumentate per migliorare la qualità
+      const canvasWidth = 750; // Aumentato da 600
+      const canvasHeight = 900; // Aumentato da 750
       
       // Canvas ottimizzato
       const canvas = document.createElement("canvas");
@@ -227,11 +227,11 @@ export default function Home() {
       ctx.fillStyle = bgColor;
       ctx.fillRect(0, 0, canvasWidth, canvasHeight);
   
-      // Preparazione SVG ottimizzata
+      // Preparazione SVG ottimizzata con dimensioni migliorate
       const svgClone = svgElement.cloneNode(true);
-      // Teniamo la dimensione SVG ottimale per nitidezza ma non eccessiva
-      svgClone.setAttribute("width", "500"); // Ridotto da 1000
-      svgClone.setAttribute("height", "500"); // Ridotto da 1000
+      // Aumentiamo la dimensione SVG per una nitidezza ottimale
+      svgClone.setAttribute("width", "650"); // Aumentato da 500
+      svgClone.setAttribute("height", "650"); // Aumentato da 500
       svgClone.setAttribute("xmlns", "http://www.w3.org/2000/svg");
       
       // Rimuovi eventuali attributi di stile che potrebbero interferire
@@ -245,8 +245,8 @@ export default function Home() {
       
       const svgData = new XMLSerializer().serializeToString(svgClone);
       
-      // Calcola dimensione QR code proporzionalmente ridotta
-      const qrSize = 450; // Ridotto da 900
+      // Calcola dimensione QR code migliorata
+      const qrSize = 550; // Aumentato da 450 per maggiore nitidezza
       const qrX = (canvasWidth - qrSize) / 2;
       const qrY = 75; // Ridotto da 150
       
@@ -267,7 +267,7 @@ export default function Home() {
       // Gestione dell'icona social e username con dimensioni ridotte
       if (type === "social" && username) {
         const tagY = canvasHeight * 0.8; // Proporzionale all'altezza del canvas
-        const iconSize = 50; // Ridotto da 100
+        const iconSize = 60; // Aumentato da 50 per maggiore visibilità
   
         // Seleziona componente icona
         const IconComponent = {
@@ -307,16 +307,16 @@ export default function Home() {
         try {
           const iconCanvas = await html2canvas(tempDiv, {
             backgroundColor: null,
-            scale: 2, // Scala fissa a 2x è sufficiente per l'icona
+            scale: 3, // Aumentato da 2 per icone più nitide
             useCORS: true,
           });
   
           const iconImage = new Image();
-          iconImage.src = iconCanvas.toDataURL("image/png", 0.95); // Qualità leggermente ridotta
+          iconImage.src = iconCanvas.toDataURL("image/png", 1.0); // Qualità massima per l'icona
   
           await new Promise((res) => {
             iconImage.onload = () => {
-              ctx.font = `bold ${34}px sans-serif`; // Ridotto da 68px
+              ctx.font = `bold ${40}px sans-serif`; // Aumentato da 34px per maggiore leggibilità
               ctx.fillStyle = fgColor;
               ctx.textAlign = "left";
               ctx.textBaseline = "middle";
@@ -340,15 +340,15 @@ export default function Home() {
         }
       }
   
-      // Footer QRastic! ridimensionato
-      ctx.font = "20px sans-serif"; // Ridotto da 40px
+      // Footer QRastic! con dimensione migliorata
+      ctx.font = "24px sans-serif"; // Aumentato da 20px per maggiore leggibilità
       ctx.fillStyle = "#888888";
       ctx.textAlign = "center";
       ctx.textBaseline = "bottom";
-      ctx.fillText("QRastic!", canvasWidth / 2, canvasHeight - 15); // Posizione adattata
+      ctx.fillText("QRcode made with QRastic!", canvasWidth / 2, canvasHeight - 15); // Posizione adattata
   
-      // Ottimizza l'immagine PNG riducendo la qualità
-      const pngDataUrl = canvas.toDataURL("image/jpeg", 0.85); // Usa JPEG invece di PNG con buona qualità
+      // Usa qualità JPEG migliorata per un risultato finale migliore
+      const pngDataUrl = canvas.toDataURL("image/jpeg", 0.92); // Aumentata da 0.85 per maggiore qualità
   
       // Configurazione del PDF ottimizzata
       const pdf = new jsPDF({
@@ -465,7 +465,7 @@ export default function Home() {
         {/* Header section with clean typography */}
         <div className="text-center mb-8">
           <h1 className="text-4xl md:text-6xl font-bold mb-2 text-gray-900 tracking-tight px-3 py-2">
-            QRastic
+            QRastic!
           </h1>
 
           <div className="flex justify-center items-center gap-3 text-xs md:text-sm text-gray-600">
