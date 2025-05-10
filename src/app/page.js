@@ -4,8 +4,8 @@ import { useEffect, useRef, useState } from "react";
 import QRCodeStyling from "qr-code-styling";
 import html2canvas from "html2canvas";
 import ReactDOMServer from "react-dom/server";
-
 import jsPDF from "jspdf";
+
 import {
   FaInstagram,
   FaFacebookF,
