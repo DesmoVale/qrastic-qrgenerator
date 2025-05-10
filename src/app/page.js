@@ -193,100 +193,148 @@ export default function Home() {
   ]);
 
   // Funzione per scaricare il QR code come SVG ad alta risoluzione
-  const downloadQR = () => {
-    if (!qrCode.current) return;
+// Funzione per scaricare il QR code come immagine ad alta risoluzione
+const downloadQR = () => {
+  if (!qrCode.current) return;
+  
+  try {
+    // Creiamo un canvas temporaneo per renderizzare tutto ad alta risoluzione
+    const canvas = document.createElement('canvas');
+    const scale = 4; // Fattore di scala per alta risoluzione
     
-    try {
-      // Primo metodo: download diretto del SVG corrente
-      const svgElement = qrRef.current.querySelector('svg');
-      
-      if (svgElement) {
-        // Creare una copia dell'SVG per l'esportazione ad alta risoluzione
-        const svgClone = svgElement.cloneNode(true);
-        
-        // Impostare dimensioni maggiori per l'esportazione
-        svgClone.setAttribute('width', EXPORT_SIZE);
-        svgClone.setAttribute('height', EXPORT_SIZE);
-        svgClone.setAttribute('viewBox', `0 0 ${EXPORT_SIZE} ${EXPORT_SIZE}`);
-        
-        // Aggiungere attributi per la qualità
-        svgClone.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
-        svgClone.setAttribute('shape-rendering', 'geometricPrecision');
-        svgClone.setAttribute('text-rendering', 'optimizeLegibility');
-        
-        // Convertire l'SVG in una stringa
-        const serializer = new XMLSerializer();
-        let svgString = serializer.serializeToString(svgClone);
-        
-        // Aggiungere metadati e info QRastic
-        const qrData = getQRData();
-        svgString = svgString.replace('</svg>', 
-          `<metadata>
-            <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
-                   xmlns:rdfs="http://www.w3.org/2000/01/rdf-schema#"
-                   xmlns:dc="http://purl.org/dc/elements/1.1/">
-              <rdf:Description>
-                <dc:title>QRastic Code</dc:title>
-                <dc:description>QR Code generato con QRastic!</dc:description>
-                <dc:creator>QRastic</dc:creator>
-                <dc:date>${new Date().toISOString()}</dc:date>
-                <dc:format>image/svg+xml</dc:format>
-                <dc:type>Image</dc:type>
-              </rdf:Description>
-            </rdf:RDF>
-          </metadata>
-          <text x="${EXPORT_SIZE/2}" y="${EXPORT_SIZE-20}" 
-                font-family="Arial, sans-serif" 
-                font-size="${EXPORT_SIZE/50}" 
-                text-anchor="middle"
-                fill="#999999">
-            Codice QR generato con QRastic!
-          </text>
-          </svg>`);
-        
-        // Creare un Blob SVG
-        const svgBlob = new Blob([svgString], { type: "image/svg+xml" });
-        
-        // Creare un URL per il download
-        const url = URL.createObjectURL(svgBlob);
-        
-        // Creare un link per il download e simulare un clic
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = "qrastic-code.svg";
-        document.body.appendChild(link);
-        link.click();
-        
-        // Pulizia
-        setTimeout(() => {
-          document.body.removeChild(link);
-          URL.revokeObjectURL(url);
-        }, 100);
-      } else {
-        // Metodo di fallback usando qr-code-styling
-        qrCode.current.download({
-          name: "qrastic-code",
-          extension: "svg"
-        }).catch(err => {
-          console.error("Errore durante il download con QRCodeStyling:", err);
-          alert("Si è verificato un errore durante il download. Riprova.");
-        });
-      }
-    } catch (error) {
-      console.error("Errore durante l'esportazione SVG:", error);
-      
-      // Terzo metodo: ultimo tentativo con QRCodeStyling diretto
-      try {
-        qrCode.current.download({
-          name: "qrastic-code",
-          extension: "svg"
-        });
-      } catch (fallbackError) {
-        console.error("Anche il fallback è fallito:", fallbackError);
-        alert("Si è verificato un errore durante il download. Riprova.");
-      }
+    // Otteniamo il QR code e determiniamo le dimensioni totali
+    const qrContainer = qrRef.current;
+    const qrElement = qrRef.current.querySelector('svg');
+    
+    if (!qrElement) {
+      throw new Error("QR code SVG non trovato");
     }
-  };
+    
+    // Determiniamo l'altezza in base alla presenza del tag social
+    const hasTagSocial = type === "social" && username;
+    
+    // Dimensioni del canvas
+    const finalWidth = DISPLAY_SIZE * scale;
+    const socialTagHeight = hasTagSocial ? 60 * scale : 0;
+    const finalHeight = DISPLAY_SIZE * scale + socialTagHeight + 30 * scale;
+    
+    canvas.width = finalWidth;
+    canvas.height = finalHeight;
+    
+    // Otteniamo il contesto del canvas
+    const ctx = canvas.getContext('2d');
+    
+    // Disegniamo lo sfondo
+    ctx.fillStyle = bgColor;
+    ctx.fillRect(0, 0, finalWidth, finalHeight);
+    
+    // Convertiamo l'SVG del QR in un'immagine
+    const svgData = new XMLSerializer().serializeToString(qrElement);
+    const svgBlob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' });
+    const svgUrl = URL.createObjectURL(svgBlob);
+    
+    // Creiamo una nuova immagine dall'SVG
+    const img = new Image();
+    
+    // Quando l'immagine è caricata, disegniamo tutto
+    img.onload = function() {
+      // Disegniamo il QR code
+      ctx.drawImage(img, 0, 0, finalWidth, DISPLAY_SIZE * scale);
+      
+      // Se abbiamo un tag social, disegniamolo
+      if (hasTagSocial) {
+        const socialTagY = DISPLAY_SIZE * scale + 10 * scale;
+        
+        // Colore specifico per il social network
+        const socialColor = {
+          'instagram': '#C13584',
+          'facebook': '#1877F2',
+          'tiktok': '#000000',
+          'linkedin': '#0A66C2'
+        }[selectedSocial] || '#4338CA';
+        
+        // Disegniamo il background del tag
+        ctx.fillStyle = '#F5F7FF';
+        ctx.strokeStyle = socialColor;
+        ctx.lineWidth = 2 * scale;
+        
+        // Creiamo un rettangolo arrotondato per il tag
+        const tagWidth = 240 * scale;
+        const tagHeight = 40 * scale;
+        const tagX = (finalWidth - tagWidth) / 2;
+        const tagY = socialTagY;
+        const radius = 20 * scale;
+        
+        ctx.beginPath();
+        ctx.moveTo(tagX + radius, tagY);
+        ctx.lineTo(tagX + tagWidth - radius, tagY);
+        ctx.quadraticCurveTo(tagX + tagWidth, tagY, tagX + tagWidth, tagY + radius);
+        ctx.lineTo(tagX + tagWidth, tagY + tagHeight - radius);
+        ctx.quadraticCurveTo(tagX + tagWidth, tagY + tagHeight, tagX + tagWidth - radius, tagY + tagHeight);
+        ctx.lineTo(tagX + radius, tagY + tagHeight);
+        ctx.quadraticCurveTo(tagX, tagY + tagHeight, tagX, tagY + tagHeight - radius);
+        ctx.lineTo(tagX, tagY + radius);
+        ctx.quadraticCurveTo(tagX, tagY, tagX + radius, tagY);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+        
+        // Aggiungiamo l'icona del social
+        ctx.fillStyle = socialColor;
+        ctx.font = `bold ${18 * scale}px Arial`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        
+        // Disegniamo il nome utente con @ davanti
+        ctx.fillText(`@${username}`, finalWidth / 2, socialTagY + tagHeight / 2);
+      }
+      
+      // Aggiungiamo il footer
+      ctx.fillStyle = '#999999';
+      ctx.font = `${10 * scale}px Arial`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'bottom';
+      ctx.fillText(`Codice QR generato con QRastic!`, finalWidth / 2, finalHeight - 5 * scale);
+      
+      // Convertiamo il canvas in un'immagine PNG
+      const pngUrl = canvas.toDataURL('image/png');
+      
+      // Creiamo un link per il download e simuliamo un clic
+      const link = document.createElement('a');
+      const fileName = type === "social" ? 
+        `qrastic-${selectedSocial}-${username}` : 
+        "qrastic-code";
+      link.download = `${fileName}.png`;
+      link.href = pngUrl;
+      document.body.appendChild(link);
+      link.click();
+      
+      // Pulizia
+      setTimeout(() => {
+        document.body.removeChild(link);
+        URL.revokeObjectURL(svgUrl);
+      }, 100);
+    };
+    
+    // Impostiamo la sorgente dell'immagine
+    img.src = svgUrl;
+    
+  } catch (error) {
+    console.error("Errore durante l'esportazione dell'immagine:", error);
+    alert("Si è verificato un errore durante il download. Riprova.");
+    
+    // Metodo di fallback
+    try {
+      qrCode.current.download({
+        name: "qrastic-code",
+        extension: "png"
+      });
+    } catch (fallbackError) {
+      console.error("Anche il fallback è fallito:", fallbackError);
+      alert("Si è verificato un errore durante il download. Riprova.");
+    }
+  }
+};
 
   const applyColorTheme = (theme) => {
     setFgColor(theme.fg);
