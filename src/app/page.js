@@ -196,181 +196,220 @@ export default function Home() {
   ]);
 
   // Funzione per scaricare il QR code come immagine ad alta risoluzione
-  const downloadQR = async () => {
-    try {
-      const svgElement = qrRef.current.querySelector("svg");
-      if (!svgElement) {
-        console.error("SVG element not found");
-        return;
+// Ottimizzazioni specifiche per iOS per migliorare la qualità del QR
+const enhanceQRforIOS = (svgElement) => {
+  // Se su iOS, ottimizziamo specificamente l'SVG per ottenere bordi netti
+  if (/iPad|iPhone|iPod/.test(navigator.userAgent)) {
+    // Trova tutti i path e rect nell'SVG che formano il QR code
+    const paths = svgElement.querySelectorAll('path, rect');
+    paths.forEach(path => {
+      // Aggiungi attributi di rendering specifici per migliorare i bordi
+      path.setAttribute('shape-rendering', 'crispEdges');
+      // Assicura che l'opacità sia al massimo
+      if (path.getAttribute('fill')) {
+        path.setAttribute('fill-opacity', '1');
       }
+    });
+  }
+  return svgElement;
+};
+
+const downloadQR = async () => {
+try {
+  const svgElement = qrRef.current.querySelector("svg");
+  if (!svgElement) {
+    console.error("SVG element not found");
+    return;
+  }
+
+  // Determina la scala appropriata basata sul dispositivo, con valori massimizzati per la qualità
+  // Usiamo 2.5 per iOS e 2 per altri dispositivi per una qualità ottimale
+  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+  const pixelRatio = Math.min(isIOS ? 2.5 : 2, window.devicePixelRatio || 2);
   
-      // Determina la scala appropriata basata sul dispositivo, con valori migliorati per la qualità
-      // Usiamo 2 per iOS e 1.5 per altri dispositivi per una migliore qualità
-      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
-      const pixelRatio = Math.min(isIOS ? 2 : 1.5, window.devicePixelRatio || 1.5);
-      
-      // Dimensioni leggermente aumentate per migliorare la qualità
-      const canvasWidth = 750; // Aumentato da 600
-      const canvasHeight = 900; // Aumentato da 750
-      
-      // Canvas ottimizzato
-      const canvas = document.createElement("canvas");
-      canvas.width = canvasWidth * pixelRatio;
-      canvas.height = canvasHeight * pixelRatio;
-      canvas.style.width = canvasWidth + "px";
-      canvas.style.height = canvasHeight + "px";
-      
-      const ctx = canvas.getContext("2d");
-      ctx.scale(pixelRatio, pixelRatio);
+  // Dimensioni aumentate per massimizzare la qualità mantenendo un file di dimensioni ragionevoli
+  const canvasWidth = 900; // Aumentato da 750
+  const canvasHeight = 1100; // Aumentato da 900
   
-      // Sfondo
-      ctx.fillStyle = bgColor;
-      ctx.fillRect(0, 0, canvasWidth, canvasHeight);
+  // Canvas ottimizzato
+  const canvas = document.createElement("canvas");
+  canvas.width = canvasWidth * pixelRatio;
+  canvas.height = canvasHeight * pixelRatio;
+  canvas.style.width = canvasWidth + "px";
+  canvas.style.height = canvasHeight + "px";
   
-      // Preparazione SVG ottimizzata con dimensioni migliorate
-      const svgClone = svgElement.cloneNode(true);
-      // Aumentiamo la dimensione SVG per una nitidezza ottimale
-      svgClone.setAttribute("width", "650"); // Aumentato da 500
-      svgClone.setAttribute("height", "650"); // Aumentato da 500
-      svgClone.setAttribute("xmlns", "http://www.w3.org/2000/svg");
+  const ctx = canvas.getContext("2d");
+  ctx.scale(pixelRatio, pixelRatio);
+
+  // Sfondo
+  ctx.fillStyle = bgColor;
+  ctx.fillRect(0, 0, canvasWidth, canvasHeight);
+
+  // Ottimizza l'SVG specificamente per iOS prima del rendering
+  const svgClone = enhanceQRforIOS(svgElement.cloneNode(true));
+  // Impostiamo una dimensione SVG molto elevata per una nitidezza eccellente
+  svgClone.setAttribute("width", "800"); // Aumentato da 650
+  svgClone.setAttribute("height", "800"); // Aumentato da 650
+  svgClone.setAttribute("xmlns", "http://www.w3.org/2000/svg");
+  
+  // Rimuovi eventuali attributi di stile che potrebbero interferire
+  Array.from(svgClone.querySelectorAll("*")).forEach(el => {
+    if (el.hasAttribute("style")) {
+      // Mantieni solo gli stili essenziali
+      const style = el.getAttribute("style");
+      el.setAttribute("style", style.replace(/opacity:[\d.]+;?/g, ""));
+    }
+  });
+  
+  const svgData = new XMLSerializer().serializeToString(svgClone);
+  
+  // Calcola dimensione QR code massimizzata
+  const qrSize = 700; // Aumentato da 550 per massima nitidezza e leggibilità
+  const qrX = (canvasWidth - qrSize) / 2;
+  const qrY = 75; // Ridotto da 150
+  
+  // Utilizzo di avanzate tecniche di rendering per iOS
+  await new Promise((resolve) => {
+    const img = new Image();
+    img.src = "data:image/svg+xml;base64," + btoa(unescape(encodeURIComponent(svgData)));
+    
+    img.onload = () => {
+      // Impostazioni avanzate per il miglior rendering possibile
+      ctx.imageSmoothingEnabled = false;
       
-      // Rimuovi eventuali attributi di stile che potrebbero interferire
-      Array.from(svgClone.querySelectorAll("*")).forEach(el => {
-        if (el.hasAttribute("style")) {
-          // Mantieni solo gli stili essenziali
-          const style = el.getAttribute("style");
-          el.setAttribute("style", style.replace(/opacity:[\d.]+;?/g, ""));
-        }
-      });
-      
-      const svgData = new XMLSerializer().serializeToString(svgClone);
-      
-      // Calcola dimensione QR code migliorata
-      const qrSize = 550; // Aumentato da 450 per maggiore nitidezza
-      const qrX = (canvasWidth - qrSize) / 2;
-      const qrY = 75; // Ridotto da 150
-      
-      // Usa direttamente l'SVG come immagine sorgente per il canvas
-      await new Promise((resolve) => {
-        const img = new Image();
-        img.src = "data:image/svg+xml;base64," + btoa(unescape(encodeURIComponent(svgData)));
+      // Per dispositivi iOS, utilizziamo una tecnica di rendering a due passaggi
+      if (isIOS) {
+        // Primo passaggio: disegna con antialiasing disattivato per bordi netti
+        ctx.drawImage(img, qrX, qrY, qrSize, qrSize);
         
-        img.onload = () => {
-          // Diamo priorità alla nitidezza usando crisp rendering
-          ctx.imageSmoothingEnabled = false;
-          ctx.drawImage(img, qrX, qrY, qrSize, qrSize);
-          ctx.imageSmoothingEnabled = true; // Riabilita per il resto del contenuto
-          resolve();
+        // Secondo passaggio: applica una leggera ombra per migliorare la contrastazione
+        ctx.shadowColor = fgColor;
+        ctx.shadowBlur = 0.5;
+        ctx.shadowOffsetX = 0;
+        ctx.shadowOffsetY = 0;
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.drawImage(img, qrX, qrY, qrSize, qrSize);
+        
+        // Ripristina le impostazioni normali
+        ctx.shadowBlur = 0;
+        ctx.globalCompositeOperation = 'source-over';
+      } else {
+        // Per Android, un passaggio è sufficiente
+        ctx.drawImage(img, qrX, qrY, qrSize, qrSize);
+      }
+      
+      ctx.imageSmoothingEnabled = true; // Riabilita per il resto del contenuto
+      resolve();
+    };
+  });
+
+  // Gestione dell'icona social e username con dimensioni ridotte
+  if (type === "social" && username) {
+    const tagY = canvasHeight * 0.82; // Posizione leggermente più bassa per bilanciare con QR code più grande
+    const iconSize = 75; // Aumentato da 60 per maggiore visibilità e qualità
+
+    // Seleziona componente icona
+    const IconComponent = {
+      instagram: FaInstagram,
+      facebook: FaFacebookF,
+      linkedin: FaLinkedin,
+      tiktok: FaTiktok,
+    }[selectedSocial];
+
+    if (!IconComponent) {
+      console.warn("Icona non trovata per:", selectedSocial);
+      return;
+    }
+
+    // Renderizza l'icona React con dimensioni ottimizzate
+    const iconMarkup = ReactDOMServer.renderToStaticMarkup(
+      <div style={{ fontSize: `${iconSize}px`, color: fgColor }}>
+        <IconComponent />
+      </div>,
+    );
+
+    // Container temporaneo con dimensioni aumentate per migliorare la qualità
+    const tempDiv = document.createElement("div");
+    tempDiv.style.position = "fixed";
+    tempDiv.style.top = "-1000px";
+    tempDiv.style.left = "-1000px";
+    tempDiv.style.width = "75px"; // Aumentato da 50px per maggiore qualità
+    tempDiv.style.height = "75px"; // Aumentato da 50px per maggiore qualità
+    tempDiv.style.display = "flex";
+    tempDiv.style.alignItems = "center";
+    tempDiv.style.justifyContent = "center";
+    tempDiv.style.background = "transparent";
+    tempDiv.style.color = fgColor;
+    tempDiv.innerHTML = iconMarkup;
+    document.body.appendChild(tempDiv);
+
+    try {
+      const iconCanvas = await html2canvas(tempDiv, {
+        backgroundColor: null,
+        scale: 4, // Aumentato a 4x per icone ad altissima definizione
+        useCORS: true,
+      });
+
+      const iconImage = new Image();
+      iconImage.src = iconCanvas.toDataURL("image/png", 1.0); // Qualità massima per l'icona
+
+      await new Promise((res) => {
+        iconImage.onload = () => {
+          ctx.font = `bold ${50}px sans-serif`; // Aumentato da 40px per maggiore leggibilità
+          ctx.fillStyle = fgColor;
+          ctx.textAlign = "left";
+          ctx.textBaseline = "middle";
+
+          const text = `@${username}`;
+          const textWidth = ctx.measureText(text).width;
+          const spacing = 10; // Ridotto da 20
+          const totalWidth = iconSize + spacing + textWidth;
+
+          const iconX = (canvasWidth - totalWidth) / 2;
+          const iconY = tagY - iconSize / 2;
+          ctx.drawImage(iconImage, iconX, iconY, iconSize, iconSize);
+
+          // Testo accanto all'icona
+          ctx.fillText(text, iconX + iconSize + spacing, tagY);
+          res();
         };
       });
-  
-      // Gestione dell'icona social e username con dimensioni ridotte
-      if (type === "social" && username) {
-        const tagY = canvasHeight * 0.8; // Proporzionale all'altezza del canvas
-        const iconSize = 60; // Aumentato da 50 per maggiore visibilità
-  
-        // Seleziona componente icona
-        const IconComponent = {
-          instagram: FaInstagram,
-          facebook: FaFacebookF,
-          linkedin: FaLinkedin,
-          tiktok: FaTiktok,
-        }[selectedSocial];
-  
-        if (!IconComponent) {
-          console.warn("Icona non trovata per:", selectedSocial);
-          return;
-        }
-  
-        // Renderizza l'icona React con dimensioni ottimizzate
-        const iconMarkup = ReactDOMServer.renderToStaticMarkup(
-          <div style={{ fontSize: `${iconSize}px`, color: fgColor }}>
-            <IconComponent />
-          </div>,
-        );
-  
-        // Container temporaneo
-        const tempDiv = document.createElement("div");
-        tempDiv.style.position = "fixed";
-        tempDiv.style.top = "-1000px";
-        tempDiv.style.left = "-1000px";
-        tempDiv.style.width = "50px"; // Ridotto da 100px
-        tempDiv.style.height = "50px"; // Ridotto da 100px
-        tempDiv.style.display = "flex";
-        tempDiv.style.alignItems = "center";
-        tempDiv.style.justifyContent = "center";
-        tempDiv.style.background = "transparent";
-        tempDiv.style.color = fgColor;
-        tempDiv.innerHTML = iconMarkup;
-        document.body.appendChild(tempDiv);
-  
-        try {
-          const iconCanvas = await html2canvas(tempDiv, {
-            backgroundColor: null,
-            scale: 3, // Aumentato da 2 per icone più nitide
-            useCORS: true,
-          });
-  
-          const iconImage = new Image();
-          iconImage.src = iconCanvas.toDataURL("image/png", 1.0); // Qualità massima per l'icona
-  
-          await new Promise((res) => {
-            iconImage.onload = () => {
-              ctx.font = `bold ${40}px sans-serif`; // Aumentato da 34px per maggiore leggibilità
-              ctx.fillStyle = fgColor;
-              ctx.textAlign = "left";
-              ctx.textBaseline = "middle";
-  
-              const text = `@${username}`;
-              const textWidth = ctx.measureText(text).width;
-              const spacing = 10; // Ridotto da 20
-              const totalWidth = iconSize + spacing + textWidth;
-  
-              const iconX = (canvasWidth - totalWidth) / 2;
-              const iconY = tagY - iconSize / 2;
-              ctx.drawImage(iconImage, iconX, iconY, iconSize, iconSize);
-  
-              // Testo accanto all'icona
-              ctx.fillText(text, iconX + iconSize + spacing, tagY);
-              res();
-            };
-          });
-        } finally {
-          document.body.removeChild(tempDiv);
-        }
-      }
-  
-      // Footer QRastic! con dimensione migliorata
-      ctx.font = "24px sans-serif"; // Aumentato da 20px per maggiore leggibilità
-      ctx.fillStyle = "#888888";
-      ctx.textAlign = "center";
-      ctx.textBaseline = "bottom";
-      ctx.fillText("QRcode made with QRastic!", canvasWidth / 2, canvasHeight - 15); // Posizione adattata
-  
-      // Usa qualità JPEG migliorata per un risultato finale migliore
-      const pngDataUrl = canvas.toDataURL("image/jpeg", 0.92); // Aumentata da 0.85 per maggiore qualità
-  
-      // Configurazione del PDF ottimizzata
-      const pdf = new jsPDF({
-        orientation: "portrait",
-        unit: "mm",
-        format: [100, 125],
-        compress: true, // Abilita la compressione
-      });
-  
-      const pdfWidth = 90;
-      const pdfHeight = 115;
-      const marginX = (100 - pdfWidth) / 2;
-      const marginY = (125 - pdfHeight) / 2;
-  
-      // Aggiungi l'immagine ottimizzata
-      pdf.addImage(pngDataUrl, "JPEG", marginX, marginY, pdfWidth, pdfHeight, null, 'FAST');
-      pdf.save("qrastic-social.pdf");
-    } catch (err) {
-      console.error("Errore durante l'esportazione:", err);
-      alert("Si è verificato un errore durante la creazione del PDF.");
+    } finally {
+      document.body.removeChild(tempDiv);
     }
-  };
+  }
+
+  // Footer QRastic! con dimensione ulteriormente aumentata
+  ctx.font = "28px sans-serif"; // Aumentato per maggiore leggibilità
+  ctx.fillStyle = "#888888";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "bottom";
+  ctx.fillText("QRastic!", canvasWidth / 2, canvasHeight - 15); // Posizione adattata
+
+  // Usa la massima qualità JPEG possibile mantenendo un peso file ragionevole
+  const pngDataUrl = canvas.toDataURL("image/jpeg", 0.98); // Qualità quasi massima
+
+  // Configurazione del PDF ottimizzata
+  const pdf = new jsPDF({
+    orientation: "portrait",
+    unit: "mm",
+    format: [100, 125],
+    compress: true, // Abilita la compressione
+  });
+
+  const pdfWidth = 90;
+  const pdfHeight = 115;
+  const marginX = (100 - pdfWidth) / 2;
+  const marginY = (125 - pdfHeight) / 2;
+
+  // Aggiungi l'immagine ottimizzata
+  pdf.addImage(pngDataUrl, "JPEG", marginX, marginY, pdfWidth, pdfHeight, null, 'FAST');
+  pdf.save("qrastic-social.pdf");
+} catch (err) {
+  console.error("Errore durante l'esportazione:", err);
+  alert("Si è verificato un errore durante la creazione del PDF.");
+}
+};
   // ------ //
 
   const applyColorTheme = (theme) => {
