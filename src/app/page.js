@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import QRCodeStyling from "qr-code-styling";
+import domtoimage from 'dom-to-image-more';
 import {
   FaInstagram,
   FaFacebookF,
@@ -192,149 +193,91 @@ export default function Home() {
     type,
   ]);
 
-  // Funzione per scaricare il QR code come SVG ad alta risoluzione
+// Funzione per scaricare il QR code come immagine ad alta risoluzione
 // Funzione per scaricare il QR code come immagine ad alta risoluzione
 const downloadQR = () => {
-  if (!qrCode.current) return;
-  
-  try {
-    // Creiamo un canvas temporaneo per renderizzare tutto ad alta risoluzione
-    const canvas = document.createElement('canvas');
-    const scale = 4; // Fattore di scala per alta risoluzione
-    
-    // Otteniamo il QR code e determiniamo le dimensioni totali
-    const qrContainer = qrRef.current;
-    const qrElement = qrRef.current.querySelector('svg');
-    
-    if (!qrElement) {
-      throw new Error("QR code SVG non trovato");
+  const node = document.getElementById('qr-container');
+  if (!node) return;
+
+  // 1) Clona il nodo per isolare modifiche
+  const clone = node.cloneNode(true);
+  clone.id = 'qr-export-clone';
+  Object.assign(clone.style, {
+    position: 'fixed',
+    left: '-9999px',
+    top: '-9999px',
+    margin: '0',
+    padding: '0',
+    background: bgColor  // mantiene lo sfondo scelto
+  });
+  // Rimuove pulsanti e messaggi di validazione
+  clone.querySelectorAll('button, p.text-orange-600').forEach(el => el.remove());
+
+  // 2) Pulisce tutti i figli da bordi, ombre, padding e margin indesiderati
+  const resetStyles = document.createElement('style');
+  resetStyles.textContent = `
+    #qr-export-clone,
+    #qr-export-clone * {
+      border: none !important;
+      box-shadow: none !important;
+      outline: none !important;
+      padding: 0 !important;
+      margin: 0 !important;
+      background: transparent !important;
     }
-    
-    // Determiniamo l'altezza in base alla presenza del tag social
-    const hasTagSocial = type === "social" && username;
-    
-    // Dimensioni del canvas
-    const finalWidth = DISPLAY_SIZE * scale;
-    const socialTagHeight = hasTagSocial ? 60 * scale : 0;
-    const finalHeight = DISPLAY_SIZE * scale + socialTagHeight + 30 * scale;
-    
-    canvas.width = finalWidth;
-    canvas.height = finalHeight;
-    
-    // Otteniamo il contesto del canvas
-    const ctx = canvas.getContext('2d');
-    
-    // Disegniamo lo sfondo
-    ctx.fillStyle = bgColor;
-    ctx.fillRect(0, 0, finalWidth, finalHeight);
-    
-    // Convertiamo l'SVG del QR in un'immagine
-    const svgData = new XMLSerializer().serializeToString(qrElement);
-    const svgBlob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' });
-    const svgUrl = URL.createObjectURL(svgBlob);
-    
-    // Creiamo una nuova immagine dall'SVG
-    const img = new Image();
-    
-    // Quando l'immagine è caricata, disegniamo tutto
-    img.onload = function() {
-      // Disegniamo il QR code
-      ctx.drawImage(img, 0, 0, finalWidth, DISPLAY_SIZE * scale);
-      
-      // Se abbiamo un tag social, disegniamolo
-      if (hasTagSocial) {
-        const socialTagY = DISPLAY_SIZE * scale + 10 * scale;
-        
-        // Colore specifico per il social network
-        const socialColor = {
-          'instagram': '#C13584',
-          'facebook': '#1877F2',
-          'tiktok': '#000000',
-          'linkedin': '#0A66C2'
-        }[selectedSocial] || '#4338CA';
-        
-        // Disegniamo il background del tag
-        ctx.fillStyle = '#F5F7FF';
-        ctx.strokeStyle = socialColor;
-        ctx.lineWidth = 2 * scale;
-        
-        // Creiamo un rettangolo arrotondato per il tag
-        const tagWidth = 240 * scale;
-        const tagHeight = 40 * scale;
-        const tagX = (finalWidth - tagWidth) / 2;
-        const tagY = socialTagY;
-        const radius = 20 * scale;
-        
-        ctx.beginPath();
-        ctx.moveTo(tagX + radius, tagY);
-        ctx.lineTo(tagX + tagWidth - radius, tagY);
-        ctx.quadraticCurveTo(tagX + tagWidth, tagY, tagX + tagWidth, tagY + radius);
-        ctx.lineTo(tagX + tagWidth, tagY + tagHeight - radius);
-        ctx.quadraticCurveTo(tagX + tagWidth, tagY + tagHeight, tagX + tagWidth - radius, tagY + tagHeight);
-        ctx.lineTo(tagX + radius, tagY + tagHeight);
-        ctx.quadraticCurveTo(tagX, tagY + tagHeight, tagX, tagY + tagHeight - radius);
-        ctx.lineTo(tagX, tagY + radius);
-        ctx.quadraticCurveTo(tagX, tagY, tagX + radius, tagY);
-        ctx.closePath();
-        ctx.fill();
-        ctx.stroke();
-        
-        // Aggiungiamo l'icona del social
-        ctx.fillStyle = socialColor;
-        ctx.font = `bold ${18 * scale}px Arial`;
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        
-        // Disegniamo il nome utente con @ davanti
-        ctx.fillText(`@${username}`, finalWidth / 2, socialTagY + tagHeight / 2);
-      }
-      
-      // Aggiungiamo il footer
-      ctx.fillStyle = '#999999';
-      ctx.font = `${10 * scale}px Arial`;
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'bottom';
-      ctx.fillText(`Codice QR generato con QRastic!`, finalWidth / 2, finalHeight - 5 * scale);
-      
-      // Convertiamo il canvas in un'immagine PNG
-      const pngUrl = canvas.toDataURL('image/png');
-      
-      // Creiamo un link per il download e simuliamo un clic
+    /* Mantieni solo padding e background del container */
+    #qr-export-clone {
+      background: ${bgColor} !important;
+      padding: 20px !important;
+    }
+  `;
+  clone.prepend(resetStyles);
+  document.body.appendChild(clone);
+
+  // 3) Calcola dimensioni con spazio extra per un framing equilibrato
+  const padding = 40;
+  const width  = 360;
+  const height = 720;
+
+  // 4) Opzioni di esportazione per alta risoluzione
+  const options = {
+    width: width,
+    height: height,
+    style: {
+      'background-color': bgColor,
+      'padding': `${padding}px`
+    },
+    pixelRatio: 8,   // risoluzione elevata
+    cacheBust: true  // forza reload di eventuali immagini esterne
+  };
+
+  // 5) Genera il PNG e avvia il download
+  domtoimage.toPng(clone, options)
+    .then(dataUrl => {
       const link = document.createElement('a');
-      const fileName = type === "social" ? 
-        `qrastic-${selectedSocial}-${username}` : 
-        "qrastic-code";
+      const fileName = (type === "social")
+        ? `qrastic-${selectedSocial}-${username}`
+        : 'qrastic-code';
       link.download = `${fileName}.png`;
-      link.href = pngUrl;
+      link.href = dataUrl;
       document.body.appendChild(link);
       link.click();
-      
-      // Pulizia
-      setTimeout(() => {
-        document.body.removeChild(link);
-        URL.revokeObjectURL(svgUrl);
-      }, 100);
-    };
-    
-    // Impostiamo la sorgente dell'immagine
-    img.src = svgUrl;
-    
-  } catch (error) {
-    console.error("Errore durante l'esportazione dell'immagine:", error);
-    alert("Si è verificato un errore durante il download. Riprova.");
-    
-    // Metodo di fallback
-    try {
-      qrCode.current.download({
-        name: "qrastic-code",
-        extension: "png"
-      });
-    } catch (fallbackError) {
-      console.error("Anche il fallback è fallito:", fallbackError);
-      alert("Si è verificato un errore durante il download. Riprova.");
-    }
-  }
+      link.remove();
+    })
+    .catch(err => {
+      console.error('Errore generazione immagine:', err);
+      alert("Errore durante la generazione dell'immagine. Riprova.");
+    })
+    .finally(() => {
+      // 6) Pulizia: rimuove il clone isolato dal DOM
+      document.body.removeChild(clone);
+    });
 };
+
+// ------ //
+
+
+
 
   const applyColorTheme = (theme) => {
     setFgColor(theme.fg);
