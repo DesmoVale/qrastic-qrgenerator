@@ -111,16 +111,19 @@ export default function Home() {
     if (type === "social") {
       setIsValid(username.trim().length > 0);
     } else {
-      // Simple validation for URLs
       if (type === "link" || type === "image" || type === "pdf") {
-        const urlPattern =
-          /^(https?:\/\/)?([\da-z.-]+)\.([a-z.]{2,6})([\/\w.-]*)*\/?$/;
-        setIsValid(value && urlPattern.test(value));
+        try {
+          new URL(value);
+          setIsValid(true);
+        } catch {
+          setIsValid(false);
+        }
       } else {
         setIsValid(value.trim().length > 0);
       }
     }
   }, [value, username, type]);
+  
 
   // Initialize QR code
   useEffect(() => {
