@@ -203,129 +203,154 @@ export default function Home() {
         console.error("SVG element not found");
         return;
       }
-
+  
+      // Crea una dimensione maggiore per l'SVG per migliorare la qualità
       const svgClone = svgElement.cloneNode(true);
-      svgClone.setAttribute("width", "160");
-      svgClone.setAttribute("height", "160");
+      svgClone.setAttribute("width", "1000"); // Aumentata da 160
+      svgClone.setAttribute("height", "1000"); // Aumentata da 160
       svgClone.setAttribute("xmlns", "http://www.w3.org/2000/svg");
       const svgData = new XMLSerializer().serializeToString(svgClone);
-
+  
+      // Rendering ad alta risoluzione per dispositivi ad alta densità di pixel
+      const pixelRatio = window.devicePixelRatio || 2; // Usiamo almeno 2x per iOS
       const canvas = document.createElement("canvas");
-      canvas.width = 1200;
-      canvas.height = 1500;
+      canvas.width = 1200 * pixelRatio;
+      canvas.height = 1500 * pixelRatio;
+      canvas.style.width = "1200px";
+      canvas.style.height = "1500px";
+      
       const ctx = canvas.getContext("2d");
-
+      ctx.scale(pixelRatio, pixelRatio);
+  
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       ctx.fillStyle = bgColor;
       ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-      const img = new Image();
-      img.src =
-        "data:image/svg+xml;base64," +
-        btoa(unescape(encodeURIComponent(svgData)));
-
+  
+      // Creiamo prima un canvas separato per il QR code per migliorare la nitidezza
+      const qrCanvas = document.createElement("canvas");
+      qrCanvas.width = 900 * pixelRatio;
+      qrCanvas.height = 900 * pixelRatio;
+      const qrCtx = qrCanvas.getContext("2d");
+      qrCtx.scale(pixelRatio, pixelRatio);
+  
+      // Usa una promessa per attendere il caricamento dell'immagine QR
       await new Promise((resolve) => {
-        img.onload = async () => {
-          ctx.drawImage(img, (canvas.width - 900) / 2, 150, 900, 900);
-
-          if (type === "social" && username) {
-            const tagY = 1200;
-            const iconSize = 100;
-
-            // Seleziona componente icona
-            const IconComponent = {
-              instagram: FaInstagram,
-              facebook: FaFacebookF,
-              linkedin: FaLinkedin,
-              tiktok: FaTiktok,
-            }[selectedSocial];
-
-            if (!IconComponent) {
-              console.warn("Icona non trovata per:", selectedSocial);
-              return;
-            }
-
-            // Renderizza l'icona React in HTML statico
-            const iconMarkup = ReactDOMServer.renderToStaticMarkup(
-              <div style={{ fontSize: `${iconSize}px`, color: fgColor }}>
-                <IconComponent />
-              </div>,
-            );
-
-            // Crea un container temporaneo fuori dallo schermo
-            const tempDiv = document.createElement("div");
-            tempDiv.style.position = "fixed";
-            tempDiv.style.top = "-1000px";
-            tempDiv.style.left = "-1000px";
-            tempDiv.style.width = "100px";
-            tempDiv.style.height = "100px";
-            tempDiv.style.display = "flex";
-            tempDiv.style.alignItems = "center";
-            tempDiv.style.justifyContent = "center";
-            tempDiv.style.background = "transparent";
-            tempDiv.style.color = fgColor;
-            tempDiv.innerHTML = iconMarkup;
-            document.body.appendChild(tempDiv);
-
-            try {
-              const iconCanvas = await html2canvas(tempDiv, {
-                backgroundColor: null,
-                scale: 2,
-                useCORS: true,
-              });
-
-              const iconImage = new Image();
-              iconImage.src = iconCanvas.toDataURL("image/png");
-
-              await new Promise((res) => {
-                iconImage.onload = () => {
-                  ctx.font = "bold 68px sans-serif";
-                  ctx.fillStyle = fgColor;
-                  ctx.textAlign = "left";
-                  ctx.textBaseline = "middle";
-
-                  const text = `@${username}`;
-                  const textWidth = ctx.measureText(text).width;
-                  const spacing = 20;
-                  const totalWidth = iconSize + spacing + textWidth;
-
-                  const iconX = (canvas.width - totalWidth) / 2;
-                  const iconY = tagY - iconSize / 2;
-                  ctx.drawImage(iconImage, iconX, iconY, iconSize, iconSize);
-
-                  // Testo centrato accanto all'icona
-                  ctx.fillText(text, iconX + iconSize + spacing, tagY);
-                  res();
-                };
-              });
-            } finally {
-              document.body.removeChild(tempDiv);
-            }
-          }
-
-          // Footer QRastic!
-          ctx.font = "40px sans-serif";
-          ctx.fillStyle = "#888888";
-          ctx.textAlign = "center";
-          ctx.textBaseline = "bottom";
-          ctx.fillText("QRastic!", canvas.width / 2, canvas.height - 30);
-
+        const img = new Image();
+        img.src = "data:image/svg+xml;base64," + btoa(unescape(encodeURIComponent(svgData)));
+        
+        img.onload = () => {
+          // Disegna il QR sul canvas dedicato
+          qrCtx.drawImage(img, 0, 0, 900, 900);
+          
+          // Ora disegna il canvas QR sul canvas principale
+          ctx.drawImage(
+            qrCanvas, 
+            0, 0, qrCanvas.width, qrCanvas.height,
+            (1200 - 900) / 2, 150, 900, 900
+          );
+          
           resolve();
         };
       });
-
-      const pngDataUrl = canvas.toDataURL("image/png");
+  
+      // Gestione dell'icona social e username
+      if (type === "social" && username) {
+        const tagY = 1200;
+        const iconSize = 100;
+  
+        // Seleziona componente icona
+        const IconComponent = {
+          instagram: FaInstagram,
+          facebook: FaFacebookF,
+          linkedin: FaLinkedin,
+          tiktok: FaTiktok,
+        }[selectedSocial];
+  
+        if (!IconComponent) {
+          console.warn("Icona non trovata per:", selectedSocial);
+          return;
+        }
+  
+        // Renderizza l'icona React in HTML statico
+        const iconMarkup = ReactDOMServer.renderToStaticMarkup(
+          <div style={{ fontSize: `${iconSize}px`, color: fgColor }}>
+            <IconComponent />
+          </div>,
+        );
+  
+        // Crea un container temporaneo fuori dallo schermo
+        const tempDiv = document.createElement("div");
+        tempDiv.style.position = "fixed";
+        tempDiv.style.top = "-1000px";
+        tempDiv.style.left = "-1000px";
+        tempDiv.style.width = "100px";
+        tempDiv.style.height = "100px";
+        tempDiv.style.display = "flex";
+        tempDiv.style.alignItems = "center";
+        tempDiv.style.justifyContent = "center";
+        tempDiv.style.background = "transparent";
+        tempDiv.style.color = fgColor;
+        tempDiv.innerHTML = iconMarkup;
+        document.body.appendChild(tempDiv);
+  
+        try {
+          const iconCanvas = await html2canvas(tempDiv, {
+            backgroundColor: null,
+            scale: pixelRatio * 2, // Aumentato per migliorare la risoluzione dell'icona
+            useCORS: true,
+          });
+  
+          const iconImage = new Image();
+          iconImage.src = iconCanvas.toDataURL("image/png");
+  
+          await new Promise((res) => {
+            iconImage.onload = () => {
+              ctx.font = `bold ${68}px sans-serif`;
+              ctx.fillStyle = fgColor;
+              ctx.textAlign = "left";
+              ctx.textBaseline = "middle";
+  
+              const text = `@${username}`;
+              const textWidth = ctx.measureText(text).width;
+              const spacing = 20;
+              const totalWidth = iconSize + spacing + textWidth;
+  
+              const iconX = (1200 - totalWidth) / 2;
+              const iconY = tagY - iconSize / 2;
+              ctx.drawImage(iconImage, iconX, iconY, iconSize, iconSize);
+  
+              // Testo centrato accanto all'icona
+              ctx.fillText(text, iconX + iconSize + spacing, tagY);
+              res();
+            };
+          });
+        } finally {
+          document.body.removeChild(tempDiv);
+        }
+      }
+  
+      // Footer QRastic!
+      ctx.font = "40px sans-serif";
+      ctx.fillStyle = "#888888";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "bottom";
+      ctx.fillText("QRastic!", 1200 / 2, 1500 - 30);
+  
+      // Crea l'immagine PNG a risoluzione maggiore
+      const pngDataUrl = canvas.toDataURL("image/png", 1.0);
+  
+      // Configurazione del PDF
       const pdf = new jsPDF({
         orientation: "portrait",
         unit: "mm",
         format: [100, 125],
       });
-
+  
       const pdfWidth = 90;
       const pdfHeight = 115;
       const marginX = (100 - pdfWidth) / 2;
       const marginY = (125 - pdfHeight) / 2;
-
+  
       pdf.addImage(pngDataUrl, "PNG", marginX, marginY, pdfWidth, pdfHeight);
       pdf.save("qrastic-social.pdf");
     } catch (err) {
