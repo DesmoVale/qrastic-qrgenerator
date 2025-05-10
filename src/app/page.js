@@ -204,59 +204,70 @@ export default function Home() {
         return;
       }
   
-      // Crea una dimensione maggiore per l'SVG per migliorare la qualità
-      const svgClone = svgElement.cloneNode(true);
-      svgClone.setAttribute("width", "1000"); // Aumentata da 160
-      svgClone.setAttribute("height", "1000"); // Aumentata da 160
-      svgClone.setAttribute("xmlns", "http://www.w3.org/2000/svg");
-      const svgData = new XMLSerializer().serializeToString(svgClone);
-  
-      // Rendering ad alta risoluzione per dispositivi ad alta densità di pixel
-      const pixelRatio = window.devicePixelRatio || 2; // Usiamo almeno 2x per iOS
+      // Determina la scala appropriata basata sul dispositivo, ma limita per controllo dimensioni
+      // Usiamo 1.5 per iOS (non 2 come prima) per bilanciare qualità e dimensione
+      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+      const pixelRatio = Math.min(isIOS ? 1.5 : 1, window.devicePixelRatio || 1);
+      
+      // Dimensioni ottimizzate per il canvas PDF
+      const canvasWidth = 600; // Ridotto da 1200
+      const canvasHeight = 750; // Ridotto da 1500
+      
+      // Canvas ottimizzato
       const canvas = document.createElement("canvas");
-      canvas.width = 1200 * pixelRatio;
-      canvas.height = 1500 * pixelRatio;
-      canvas.style.width = "1200px";
-      canvas.style.height = "1500px";
+      canvas.width = canvasWidth * pixelRatio;
+      canvas.height = canvasHeight * pixelRatio;
+      canvas.style.width = canvasWidth + "px";
+      canvas.style.height = canvasHeight + "px";
       
       const ctx = canvas.getContext("2d");
       ctx.scale(pixelRatio, pixelRatio);
   
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      // Sfondo
       ctx.fillStyle = bgColor;
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.fillRect(0, 0, canvasWidth, canvasHeight);
   
-      // Creiamo prima un canvas separato per il QR code per migliorare la nitidezza
-      const qrCanvas = document.createElement("canvas");
-      qrCanvas.width = 900 * pixelRatio;
-      qrCanvas.height = 900 * pixelRatio;
-      const qrCtx = qrCanvas.getContext("2d");
-      qrCtx.scale(pixelRatio, pixelRatio);
-  
-      // Usa una promessa per attendere il caricamento dell'immagine QR
+      // Preparazione SVG ottimizzata
+      const svgClone = svgElement.cloneNode(true);
+      // Teniamo la dimensione SVG ottimale per nitidezza ma non eccessiva
+      svgClone.setAttribute("width", "500"); // Ridotto da 1000
+      svgClone.setAttribute("height", "500"); // Ridotto da 1000
+      svgClone.setAttribute("xmlns", "http://www.w3.org/2000/svg");
+      
+      // Rimuovi eventuali attributi di stile che potrebbero interferire
+      Array.from(svgClone.querySelectorAll("*")).forEach(el => {
+        if (el.hasAttribute("style")) {
+          // Mantieni solo gli stili essenziali
+          const style = el.getAttribute("style");
+          el.setAttribute("style", style.replace(/opacity:[\d.]+;?/g, ""));
+        }
+      });
+      
+      const svgData = new XMLSerializer().serializeToString(svgClone);
+      
+      // Calcola dimensione QR code proporzionalmente ridotta
+      const qrSize = 450; // Ridotto da 900
+      const qrX = (canvasWidth - qrSize) / 2;
+      const qrY = 75; // Ridotto da 150
+      
+      // Usa direttamente l'SVG come immagine sorgente per il canvas
       await new Promise((resolve) => {
         const img = new Image();
         img.src = "data:image/svg+xml;base64," + btoa(unescape(encodeURIComponent(svgData)));
         
         img.onload = () => {
-          // Disegna il QR sul canvas dedicato
-          qrCtx.drawImage(img, 0, 0, 900, 900);
-          
-          // Ora disegna il canvas QR sul canvas principale
-          ctx.drawImage(
-            qrCanvas, 
-            0, 0, qrCanvas.width, qrCanvas.height,
-            (1200 - 900) / 2, 150, 900, 900
-          );
-          
+          // Diamo priorità alla nitidezza usando crisp rendering
+          ctx.imageSmoothingEnabled = false;
+          ctx.drawImage(img, qrX, qrY, qrSize, qrSize);
+          ctx.imageSmoothingEnabled = true; // Riabilita per il resto del contenuto
           resolve();
         };
       });
   
-      // Gestione dell'icona social e username
+      // Gestione dell'icona social e username con dimensioni ridotte
       if (type === "social" && username) {
-        const tagY = 1200;
-        const iconSize = 100;
+        const tagY = canvasHeight * 0.8; // Proporzionale all'altezza del canvas
+        const iconSize = 50; // Ridotto da 100
   
         // Seleziona componente icona
         const IconComponent = {
@@ -271,20 +282,20 @@ export default function Home() {
           return;
         }
   
-        // Renderizza l'icona React in HTML statico
+        // Renderizza l'icona React con dimensioni ottimizzate
         const iconMarkup = ReactDOMServer.renderToStaticMarkup(
           <div style={{ fontSize: `${iconSize}px`, color: fgColor }}>
             <IconComponent />
           </div>,
         );
   
-        // Crea un container temporaneo fuori dallo schermo
+        // Container temporaneo
         const tempDiv = document.createElement("div");
         tempDiv.style.position = "fixed";
         tempDiv.style.top = "-1000px";
         tempDiv.style.left = "-1000px";
-        tempDiv.style.width = "100px";
-        tempDiv.style.height = "100px";
+        tempDiv.style.width = "50px"; // Ridotto da 100px
+        tempDiv.style.height = "50px"; // Ridotto da 100px
         tempDiv.style.display = "flex";
         tempDiv.style.alignItems = "center";
         tempDiv.style.justifyContent = "center";
@@ -296,30 +307,30 @@ export default function Home() {
         try {
           const iconCanvas = await html2canvas(tempDiv, {
             backgroundColor: null,
-            scale: pixelRatio * 2, // Aumentato per migliorare la risoluzione dell'icona
+            scale: 2, // Scala fissa a 2x è sufficiente per l'icona
             useCORS: true,
           });
   
           const iconImage = new Image();
-          iconImage.src = iconCanvas.toDataURL("image/png");
+          iconImage.src = iconCanvas.toDataURL("image/png", 0.95); // Qualità leggermente ridotta
   
           await new Promise((res) => {
             iconImage.onload = () => {
-              ctx.font = `bold ${68}px sans-serif`;
+              ctx.font = `bold ${34}px sans-serif`; // Ridotto da 68px
               ctx.fillStyle = fgColor;
               ctx.textAlign = "left";
               ctx.textBaseline = "middle";
   
               const text = `@${username}`;
               const textWidth = ctx.measureText(text).width;
-              const spacing = 20;
+              const spacing = 10; // Ridotto da 20
               const totalWidth = iconSize + spacing + textWidth;
   
-              const iconX = (1200 - totalWidth) / 2;
+              const iconX = (canvasWidth - totalWidth) / 2;
               const iconY = tagY - iconSize / 2;
               ctx.drawImage(iconImage, iconX, iconY, iconSize, iconSize);
   
-              // Testo centrato accanto all'icona
+              // Testo accanto all'icona
               ctx.fillText(text, iconX + iconSize + spacing, tagY);
               res();
             };
@@ -329,21 +340,22 @@ export default function Home() {
         }
       }
   
-      // Footer QRastic!
-      ctx.font = "40px sans-serif";
+      // Footer QRastic! ridimensionato
+      ctx.font = "20px sans-serif"; // Ridotto da 40px
       ctx.fillStyle = "#888888";
       ctx.textAlign = "center";
       ctx.textBaseline = "bottom";
-      ctx.fillText("QRastic!", 1200 / 2, 1500 - 30);
+      ctx.fillText("QRastic!", canvasWidth / 2, canvasHeight - 15); // Posizione adattata
   
-      // Crea l'immagine PNG a risoluzione maggiore
-      const pngDataUrl = canvas.toDataURL("image/png", 1.0);
+      // Ottimizza l'immagine PNG riducendo la qualità
+      const pngDataUrl = canvas.toDataURL("image/jpeg", 0.85); // Usa JPEG invece di PNG con buona qualità
   
-      // Configurazione del PDF
+      // Configurazione del PDF ottimizzata
       const pdf = new jsPDF({
         orientation: "portrait",
         unit: "mm",
         format: [100, 125],
+        compress: true, // Abilita la compressione
       });
   
       const pdfWidth = 90;
@@ -351,14 +363,14 @@ export default function Home() {
       const marginX = (100 - pdfWidth) / 2;
       const marginY = (125 - pdfHeight) / 2;
   
-      pdf.addImage(pngDataUrl, "PNG", marginX, marginY, pdfWidth, pdfHeight);
+      // Aggiungi l'immagine ottimizzata
+      pdf.addImage(pngDataUrl, "JPEG", marginX, marginY, pdfWidth, pdfHeight, null, 'FAST');
       pdf.save("qrastic-social.pdf");
     } catch (err) {
       console.error("Errore durante l'esportazione:", err);
       alert("Si è verificato un errore durante la creazione del PDF.");
     }
   };
-
   // ------ //
 
   const applyColorTheme = (theme) => {
