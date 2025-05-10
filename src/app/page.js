@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import QRCodeStyling from "qr-code-styling";
-import { toJpeg } from "html-to-image";
+import { toJpeg, toPng } from "html-to-image";
 import {
   FaInstagram,
   FaFacebookF,
@@ -214,8 +214,8 @@ export default function Home() {
     
     // Opzioni avanzate con considerazione della densità pixel del dispositivo
     const options = {
-      quality: 0.95,              // Alta qualità per l'immagine JPEG
-      pixelRatio: Math.max(pixelRatio, 2), // Usa almeno 2x o il pixelRatio del dispositivo se maggiore
+      quality: 1,              // Alta qualità per l'immagine JPEG
+      pixelRatio: 2, // Usa almeno 2x o il pixelRatio del dispositivo se maggiore
       backgroundColor: "white",
       // Gestione dei font
       fontEmbedCSS: null,
@@ -238,7 +238,7 @@ export default function Home() {
     };
   
     // Utilizziamo html-to-image per catturare l'intero container
-    toJpeg(qrContainer, options)
+    toPng(qrContainer, options)
       .then((dataUrl) => {
         // Crea un link per il download
         const link = document.createElement("a");
