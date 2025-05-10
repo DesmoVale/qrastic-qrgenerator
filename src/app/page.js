@@ -124,13 +124,13 @@ export default function Home() {
     // Determina la dimensione appropriata in base alla viewport
     const isMobile = window.innerWidth < 768;
     const qrSize = isMobile ? 240 : 280; // Dimensione leggermente più piccola su mobile
-    
+    const dpr = window.devicePixelRatio || 1;
+
     qrCode.current = new QRCodeStyling({
-      width: qrSize,
-      height: qrSize,
+      width: qrSize * dpr,
+      height: qrSize * dpr,
       type: "canvas",
       data: DEFAULT_QR_DATA,
-      image: "",
       dotsOptions: {
         color: fgColor,
         type: dotStyle,
@@ -153,6 +153,8 @@ export default function Home() {
       },
     });
   
+    qrRef.current.style.width  = `${qrSize}px`;
+    qrRef.current.style.height = `${qrSize}px`;
     qrCode.current.append(qrRef.current);
     
     // Aggiungi un listener per ridimensionare il QR code quando cambia l'orientamento del dispositivo
@@ -215,7 +217,7 @@ export default function Home() {
     // Opzioni avanzate con considerazione della densità pixel del dispositivo
     const options = {
       quality: 1,              // Alta qualità per l'immagine JPEG
-      pixelRatio: 1, // Usa almeno 2x o il pixelRatio del dispositivo se maggiore
+      pixelRatio: pixelRatio, 
       backgroundColor: "white",
       // Gestione dei font
       fontEmbedCSS: null,
