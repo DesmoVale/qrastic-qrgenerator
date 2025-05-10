@@ -195,82 +195,64 @@ export default function Home() {
 
 
 // Funzione per scaricare il QR code come immagine ad alta risoluzione
-const downloadQR = () => {
-  const node = document.getElementById('qr-container');
+const downloadQR = async () => {
+  const node = document.getElementById("qr-container");
   if (!node) return;
 
-  // 1) Clona il nodo per isolare modifiche
+  // Clona il nodo per la cattura
   const clone = node.cloneNode(true);
-  clone.id = 'qr-export-clone';
+  clone.id = "qr-export-clone";
   Object.assign(clone.style, {
-    position: 'fixed',
-    left: '-9999px',
-    top: '-9999px',
-    margin: '0',
-    padding: '0',
-    background: bgColor  // mantiene lo sfondo scelto
+    position: "absolute",
+    left: "-9999px",
+    top: "0",
+    width: "800px",
+    height: "800px",
+    backgroundColor: bgColor,
   });
-  // Rimuove pulsanti e messaggi di validazione
-  clone.querySelectorAll('button, p.text-orange-600').forEach(el => el.remove());
 
-  // 2) Pulisce tutti i figli da bordi, ombre, padding e margin indesiderati
-  const resetStyles = document.createElement('style');
-  resetStyles.textContent = `
-    #qr-export-clone,
-    #qr-export-clone * {
-      border: none !important;
-      box-shadow: none !important;
-      outline: none !important;
-      padding: 0 !important;
-      margin: 0 !important;
-      background: transparent !important;
-    }
-    /* Mantieni solo padding e background del container */
-    #qr-export-clone {
-      background: ${bgColor} !important;
-      padding: 0 !important;  // rimuovi padding extra non necessari
-    }
-  `;
-  clone.prepend(resetStyles);
+  // Rimuove elementi non desiderati come pulsanti
+  clone.querySelectorAll("button, .no-export").forEach((el) => el.remove());
+
+  // Assicura che gli SVG siano renderizzati correttamente
+  const qrSvg = qrRef.current?.querySelector("svg");
+  if (qrSvg) {
+    const qrClone = qrSvg.cloneNode(true);
+    const exportContainer = clone.querySelector("#qr-ref") || clone;
+    exportContainer.innerHTML = ""; // Pulisce il vecchio contenuto
+    exportContainer.appendChild(qrClone);
+  }
+
+  // Appende il clone invisibile nel DOM
   document.body.appendChild(clone);
 
-  // 3) Imposta la dimensione finale dell'immagine (es. 1080x1080)
-  const exportWidth = 800;  // Impostato per una qualità alta
-  const exportHeight = 800; // Impostato per una qualità alta
-
-  // 4) Imposta opzioni di esportazione per alta risoluzione
   const options = {
-    width: exportWidth,
-    height: exportHeight,
+    width: 1080,
+    height: 1080,
     style: {
-      'background-color': bgColor,
-      'padding': '0px'  // Rimuove padding aggiuntivo
+      transform: "scale(1)",
+      transformOrigin: "top left",
+      backgroundColor: bgColor,
     },
-    pixelRatio: 20, // Aumentato per risoluzione molto alta
-    cacheBust: true  // Forza il reload delle immagini esterne
+    pixelRatio: 4,
+    cacheBust: true,
   };
 
-  // 5) Genera il PNG e avvia il download
-  domtoimage.toPng(clone, options)
-    .then(dataUrl => {
-      const link = document.createElement('a');
-      const fileName = (type === "social")
-        ? `qrastic-${selectedSocial}-${username}`
-        : 'qrastic-code';
-      link.download = `${fileName}.png`;
-      link.href = dataUrl;
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-    })
-    .catch(err => {
-      console.error('Errore generazione immagine:', err);
-      alert("Errore durante la generazione dell'immagine. Riprova.");
-    })
-    .finally(() => {
-      // 6) Pulizia: rimuove il clone isolato dal DOM
-      document.body.removeChild(clone);
-    });
+  try {
+    const dataUrl = await domtoimage.toPng(clone, options);
+    const link = document.createElement("a");
+    const fileName =
+      type === "social" ? `qrastic-${selectedSocial}-${username}` : "qrastic-code";
+    link.download = `${fileName}.png`;
+    link.href = dataUrl;
+    link.click();
+  } catch (err) {
+    console.error("Errore durante l'esportazione:", err);
+    alert("Errore durante la generazione dell'immagine. Riprova.");
+  } finally {
+    // Rimuove il nodo temporaneo dal DOM
+    document.body.removeChild(clone);
+  }
 };
 
 // ------ //
