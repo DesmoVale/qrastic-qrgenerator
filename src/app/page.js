@@ -2,7 +2,6 @@
 
 import { useEffect, useRef, useState } from "react";
 import QRCodeStyling from "qr-code-styling";
-import { toJpeg } from "html-to-image";
 import {
   FaInstagram,
   FaFacebookF,
@@ -49,6 +48,10 @@ const colorThemes = [
 // Default placeholder QR code data
 const DEFAULT_QR_DATA = "https://example.com";
 
+// Definizione dimensione di esportazione (maggiore per alta risoluzione)
+const EXPORT_SIZE = 1024;
+const DISPLAY_SIZE = 280;
+
 export default function Home() {
   const qrRef = useRef(null);
   const qrCode = useRef(null);
@@ -65,12 +68,10 @@ export default function Home() {
   const [isValid, setIsValid] = useState(false);
   const [showInfo, setShowInfo] = useState(false);
   // Responsiveness
-  // Aggiungi questi stati nel tuo componente principale
   const [showColorThemes, setShowColorThemes] = useState(true);
   const [showStyleOptions, setShowStyleOptions] = useState(true);
 
-  // Su mobile, potresti voler inizializzare con questi valori a false
-  // e mostrarli espansi solo su desktop
+  // On mobile, initialize with collapsed sections
   useEffect(() => {
     const handleResize = () => {
       const isMobile = window.innerWidth < 768;
@@ -101,7 +102,6 @@ export default function Home() {
     }
     return value || DEFAULT_QR_DATA;
   };
-  ////
 
   // Validate input
   useEffect(() => {
@@ -122,9 +122,9 @@ export default function Home() {
   // Initialize QR code
   useEffect(() => {
     qrCode.current = new QRCodeStyling({
-      width: 280,
-      height: 280,
-      type: "canvas",
+      width: DISPLAY_SIZE,
+      height: DISPLAY_SIZE,
+      type: "svg", // Cambiato da canvas a svg per supporto vettoriale
       data: DEFAULT_QR_DATA, // Show default QR code on load
       image: "",
       dotsOptions: {
@@ -142,6 +142,12 @@ export default function Home() {
         type: eyeStyle,
         color: fgColor,
       },
+      // Improve dot quality for better definition
+      qrOptions: {
+        errorCorrectionLevel: 'H', // Highest error correction level
+        typeNumber: 0,
+        mode: 'Byte',
+      }
     });
 
     qrCode.current.append(qrRef.current);
@@ -168,6 +174,11 @@ export default function Home() {
           type: eyeStyle,
           color: fgColor,
         },
+        qrOptions: {
+          errorCorrectionLevel: 'H',
+          typeNumber: 0,
+          mode: 'Byte',
+        }
       });
     }
   }, [
@@ -181,43 +192,100 @@ export default function Home() {
     type,
   ]);
 
+  // Funzione per scaricare il QR code come SVG ad alta risoluzione
   const downloadQR = () => {
-    // Cattura l'intero elemento con la cornice e il tag social
-    const qrContainer = document.getElementById("qr-container");
-
-    // Opzioni avanzate per risolvere il problema "font is undefined"
-    const options = {
-      quality: 1,
-      pixelRatio: 1, // Migliore qualità per il download
-      backgroundColor: "white",
-      // Gestione dei font per evitare l'errore "font is undefined"
-      fontEmbedCSS: null,
-      skipFonts: true,
-      // Ignora errori di caricamento per elementi esterni
-      onCloneNode: (node) => {
-        if (node.tagName && node.tagName === "CANVAS") {
-          // Clona direttamente i canvas per mantenere il loro contenuto
-          const canvas = node.cloneNode(false);
-          canvas.getContext("2d").drawImage(node, 0, 0);
-          return canvas;
-        }
-        return node;
-      },
-    };
-
-    // Utilizziamo html-to-image per catturare l'intero container
-    toJpeg(qrContainer, options)
-      .then((dataUrl) => {
-        // Crea un link per il download
-        const link = document.createElement("a");
-        link.download = "qr-code-completo.jpeg";
-        link.href = dataUrl;
+    if (!qrCode.current) return;
+    
+    try {
+      // Primo metodo: download diretto del SVG corrente
+      const svgElement = qrRef.current.querySelector('svg');
+      
+      if (svgElement) {
+        // Creare una copia dell'SVG per l'esportazione ad alta risoluzione
+        const svgClone = svgElement.cloneNode(true);
+        
+        // Impostare dimensioni maggiori per l'esportazione
+        svgClone.setAttribute('width', EXPORT_SIZE);
+        svgClone.setAttribute('height', EXPORT_SIZE);
+        svgClone.setAttribute('viewBox', `0 0 ${EXPORT_SIZE} ${EXPORT_SIZE}`);
+        
+        // Aggiungere attributi per la qualità
+        svgClone.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+        svgClone.setAttribute('shape-rendering', 'geometricPrecision');
+        svgClone.setAttribute('text-rendering', 'optimizeLegibility');
+        
+        // Convertire l'SVG in una stringa
+        const serializer = new XMLSerializer();
+        let svgString = serializer.serializeToString(svgClone);
+        
+        // Aggiungere metadati e info QRastic
+        const qrData = getQRData();
+        svgString = svgString.replace('</svg>', 
+          `<metadata>
+            <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+                   xmlns:rdfs="http://www.w3.org/2000/01/rdf-schema#"
+                   xmlns:dc="http://purl.org/dc/elements/1.1/">
+              <rdf:Description>
+                <dc:title>QRastic Code</dc:title>
+                <dc:description>QR Code generato con QRastic!</dc:description>
+                <dc:creator>QRastic</dc:creator>
+                <dc:date>${new Date().toISOString()}</dc:date>
+                <dc:format>image/svg+xml</dc:format>
+                <dc:type>Image</dc:type>
+              </rdf:Description>
+            </rdf:RDF>
+          </metadata>
+          <text x="${EXPORT_SIZE/2}" y="${EXPORT_SIZE-20}" 
+                font-family="Arial, sans-serif" 
+                font-size="${EXPORT_SIZE/50}" 
+                text-anchor="middle"
+                fill="#999999">
+            Codice QR generato con QRastic!
+          </text>
+          </svg>`);
+        
+        // Creare un Blob SVG
+        const svgBlob = new Blob([svgString], { type: "image/svg+xml" });
+        
+        // Creare un URL per il download
+        const url = URL.createObjectURL(svgBlob);
+        
+        // Creare un link per il download e simulare un clic
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = "qrastic-code.svg";
+        document.body.appendChild(link);
         link.click();
-      })
-      .catch((error) => {
-        console.error("Errore durante la generazione dell'immagine:", error);
-        alert("Errore durante la generazione dell'immagine");
-      });
+        
+        // Pulizia
+        setTimeout(() => {
+          document.body.removeChild(link);
+          URL.revokeObjectURL(url);
+        }, 100);
+      } else {
+        // Metodo di fallback usando qr-code-styling
+        qrCode.current.download({
+          name: "qrastic-code",
+          extension: "svg"
+        }).catch(err => {
+          console.error("Errore durante il download con QRCodeStyling:", err);
+          alert("Si è verificato un errore durante il download. Riprova.");
+        });
+      }
+    } catch (error) {
+      console.error("Errore durante l'esportazione SVG:", error);
+      
+      // Terzo metodo: ultimo tentativo con QRCodeStyling diretto
+      try {
+        qrCode.current.download({
+          name: "qrastic-code",
+          extension: "svg"
+        });
+      } catch (fallbackError) {
+        console.error("Anche il fallback è fallito:", fallbackError);
+        alert("Si è verificato un errore durante il download. Riprova.");
+      }
+    }
   };
 
   const applyColorTheme = (theme) => {
@@ -566,7 +634,7 @@ export default function Home() {
                   </span>
                 </div>
               )}
-              <p className="text-gray-500 text-xs mt-1">
+              <p className="text-gray-500 text-xs mt-1 font-sans">
                 Codice QR generato con QRastic!
               </p>
             </div>
@@ -582,7 +650,7 @@ export default function Home() {
                 }`}
               >
                 <FaDownload size={18} />
-                Scarica QR Code
+                Scarica QR Code SVG
               </button>
 
               {!isValid && (
