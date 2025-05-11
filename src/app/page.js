@@ -21,6 +21,7 @@ import {
   FaInfoCircle,
   FaHeart,
   FaBalanceScale,
+  FaCookieBite
 } from "react-icons/fa";
 import { HiColorSwatch } from "react-icons/hi";
 
@@ -156,6 +157,11 @@ const SidebarMenu = ({ isOpen, onClose }) => {
       name: "Licenses",
       icon: <FaBalanceScale className="mr-3" />,
       href: "#licenses",
+    },
+    {
+      name: "Cookies",
+      icon: <FaCookieBite className="mr-3" />,
+      href: "cookies",
     },
   ];
   return (
