@@ -399,9 +399,9 @@ export default function Home() {
       ctx.fillStyle = bgColor;
       ctx.fillRect(0, 0, baseCanvasWidth, baseCanvasHeight);
   
-      // SOLUZIONE ALTERNATIVA PER iOS:
-      // Invece di manipolare l'SVG del QR esistente, lo renderizziamo una prima volta
-      // e poi aggiungiamo manualmente l'icona social al centro
+      // SOLUZIONE PER TUTTI I DISPOSITIVI:
+      // Sempre rimuoviamo l'icona centrale e la disegniamo manualmente
+      // per garantire la coerenza su tutti i dispositivi
       
       // 1. Rendering base del QR
       const qrSizeOnCanvas = 780;
@@ -409,7 +409,7 @@ export default function Home() {
       const qrY = 60;
   
       // Clona e migliora l'SVG per il rendering
-      const svgClone = enhanceQRforIOS(svgElement.cloneNode(true));
+      const svgClone = isIOS ? enhanceQRforIOS(svgElement.cloneNode(true)) : svgElement.cloneNode(true);
       const svgRenderWidth = 880;
       const svgRenderHeight = 880;
       svgClone.setAttribute("width", String(svgRenderWidth));
@@ -422,13 +422,12 @@ export default function Home() {
         el.removeAttribute("filter");
       });
       
-      // Se siamo su iOS e abbiamo un QR social, rimuoviamo temporaneamente l'immagine centrale
-      // per renderizzarla separatamente dopo
+      // Rimuoviamo sempre l'icona centrale se è un QR sociale
       let centralIconRemoved = false;
-      if (isIOS && type === "social") {
+      if (type === "social") {
         const imageElements = Array.from(svgClone.querySelectorAll("image"));
         if (imageElements.length > 0) {
-          // Rimuoviamo temporaneamente l'elemento immagine per iOS
+          // Rimuoviamo temporaneamente l'elemento immagine
           imageElements.forEach(img => {
             if (img.parentNode) {
               img.parentNode.removeChild(img);
@@ -440,7 +439,7 @@ export default function Home() {
   
       const svgData = new XMLSerializer().serializeToString(svgClone);
       
-      // Primo rendering: QR base senza icona centrale (se su iOS e QR social)
+      // Primo rendering: QR base senza icona centrale
       await new Promise((resolve, reject) => {
         const img = new Image();
         img.crossOrigin = "anonymous";
@@ -479,33 +478,79 @@ export default function Home() {
         img.src = svgUrl;
       });
   
-      // 2. Se è un QR sociale su iOS, ora aggiungiamo manualmente l'icona al centro
-      if (isIOS && type === "social" && centralIconRemoved && selectedSocial) {
+      // 2. Aggiungiamo sempre manualmente l'icona al centro per QR sociali
+      if (type === "social" && centralIconRemoved && selectedSocial) {
         try {
           // Calcoliamo le dimensioni dell'icona centrale
           const iconSize = qrSizeOnCanvas * 0.25; // 25% della dimensione del QR
           const iconX = qrX + (qrSizeOnCanvas - iconSize) / 2;
           const iconY = qrY + (qrSizeOnCanvas - iconSize) / 2;
           
-          // Generiamo direttamente l'icona social
-          const iconColor = fgColor; // Usa lo stesso colore del QR
-          const iconDataUrl = await getSocialIconSvgDataUrl(selectedSocial, iconColor);
-          
-          if (iconDataUrl) {
-            // Rendiamo l'icona separatamente
-            await new Promise((resolve, reject) => {
-              const iconImg = new Image();
-              iconImg.crossOrigin = "anonymous";
-              iconImg.onload = () => {
-                ctx.drawImage(iconImg, iconX, iconY, iconSize, iconSize);
-                resolve();
-              };
-              iconImg.onerror = (e) => {
-                console.error("Failed to load social icon for center:", e);
-                reject(e);
-              };
-              iconImg.src = iconDataUrl;
+          // Invece di usare getSocialIconSvgDataUrl, rendiamo direttamente ogni icona come immagine
+          const IconComponent = {
+            instagram: FaInstagram,
+            facebook: FaFacebookF,
+            linkedin: FaLinkedin,
+            tiktok: FaTiktok,
+          }[selectedSocial];
+  
+          if (IconComponent) {
+            // Renderizza direttamente l'icona React con il fgColor del QR
+            const iconMarkup = ReactDOMServer.renderToStaticMarkup(
+              <div style={{ 
+                fontSize: `${iconSize}px`, 
+                color: fgColor,
+                width: `${iconSize}px`,
+                height: `${iconSize}px`,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center"
+              }}>
+                <IconComponent />
+              </div>
+            );
+  
+            const tempDiv = document.createElement("div");
+            Object.assign(tempDiv.style, {
+              position: "fixed",
+              top: "-3000px",
+              left: "-3000px",
+              width: `${iconSize}px`,
+              height: `${iconSize}px`,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              background: "transparent",
             });
+            tempDiv.innerHTML = iconMarkup;
+            document.body.appendChild(tempDiv);
+  
+            try {
+              const iconCanvas = await html2canvas(tempDiv, {
+                backgroundColor: null,
+                scale: isIOS ? 4 : 3,
+                useCORS: true,
+                logging: false,
+              });
+  
+              const iconImage = new Image();
+              iconImage.src = iconCanvas.toDataURL("image/png", 1.0);
+  
+              await new Promise((res, rej) => {
+                iconImage.onload = () => {
+                  ctx.drawImage(iconImage, iconX, iconY, iconSize, iconSize);
+                  res();
+                };
+                iconImage.onerror = (e) => {
+                  console.error("Image load error for central social icon:", e);
+                  rej(e);
+                };
+              });
+            } finally {
+              if (document.body.contains(tempDiv)) {
+                document.body.removeChild(tempDiv);
+              }
+            }
           }
         } catch (iconErr) {
           console.error("Error drawing center icon:", iconErr);
@@ -654,6 +699,8 @@ export default function Home() {
       );
     }
   };
+
+
   const applyColorTheme = (theme) => {
     setFgColor(theme.fg);
     setBgColor(theme.bg);
