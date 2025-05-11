@@ -21,7 +21,7 @@ import {
   FaInfoCircle,
   FaHeart,
   FaBalanceScale,
-  FaCookieBite
+  FaCookieBite,
 } from "react-icons/fa";
 import { HiColorSwatch } from "react-icons/hi";
 
@@ -117,9 +117,18 @@ const Header = ({ siteTitle, onMenuToggle }) => {
         >
           <FaBars size={24} />
         </button>
-        <div className="text-2xl font-bold tracking-tight flex-grow text-center md:text-left pl-10 md:pl-0">
+
+        <div className="flex items-center text-2xl font-bold tracking-tight flex-grow text-center md:text-left pl-10 md:pl-0">
+          <img
+            src="/QRastic___2_-removebg-preview.png"
+            alt="Logo QRastic"
+            width="40"
+            height="40"
+            className="mr-2"
+          />
           {siteTitle}
         </div>
+
         <nav className="hidden md:flex space-x-6 items-center">
           <a href="#" className="hover:text-gray-300 transition-colors">
             Home
@@ -137,12 +146,12 @@ const Header = ({ siteTitle, onMenuToggle }) => {
             Licenses
           </a>
         </nav>
+
         <div className="w-10 md:hidden"></div>
       </div>
     </header>
   );
 };
-
 // Componente Menu Laterale
 const SidebarMenu = ({ isOpen, onClose }) => {
   const menuItems = [
@@ -363,18 +372,18 @@ export default function Home() {
         console.error("SVG element for QR not found");
         return;
       }
-
+  
       const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
       // Aumenta pixelRatio per una qualità ancora maggiore, specialmente per iOS
       const pixelRatio = Math.min(
-        isIOS ? 3 : 2.5,
+        isIOS ? 4 : 2.5, // Aumentato per iOS da 3 a 4
         window.devicePixelRatio || 2.5,
       );
-
+  
       // Dimensioni base del canvas (verranno moltiplicate per pixelRatio)
       const baseCanvasWidth = 1000; // Aumentato per più dettagli
       const baseCanvasHeight = 1200; // Aumentato
-
+  
       const canvas = document.createElement("canvas");
       canvas.width = baseCanvasWidth * pixelRatio;
       canvas.height = baseCanvasHeight * pixelRatio;
@@ -382,14 +391,14 @@ export default function Home() {
         width: `${baseCanvasWidth}px`,
         height: `${baseCanvasHeight}px`,
       });
-
+  
       const ctx = canvas.getContext("2d");
       ctx.scale(pixelRatio, pixelRatio); // Scala il contesto per disegnare ad alta risoluzione
-
+  
       // Sfondo del PDF (canvas principale)
       ctx.fillStyle = bgColor; // Usa il bgColor del QR per coerenza, o un bianco fisso per il "foglio"
       ctx.fillRect(0, 0, baseCanvasWidth, baseCanvasHeight);
-
+  
       // Clona e migliora l'SVG per il rendering
       const svgClone = enhanceQRforIOS(svgElement.cloneNode(true));
       // Dimensioni dell'SVG da renderizzare nel canvas. Aumentate.
@@ -398,26 +407,54 @@ export default function Home() {
       svgClone.setAttribute("width", String(svgRenderWidth));
       svgClone.setAttribute("height", String(svgRenderHeight));
       svgClone.setAttribute("xmlns", "http://www.w3.org/2000/svg");
-      Array.from(svgClone.querySelectorAll("*")).forEach(
-        (el) => (el.style.opacity = ""),
-      ); // Rimuovi opacità
-
+      
+      // IMPORTANTE: Su iOS, le immagini nel QR code possono richiedere attributi specifici
+      // Trova eventuali elementi immagine nel SVG del QR code
+      const imageElements = Array.from(svgClone.querySelectorAll("image"));
+      imageElements.forEach(img => {
+        // Assicurati che l'immagine abbia preserveAspectRatio corretto
+        img.setAttribute("preserveAspectRatio", "xMidYMid meet");
+        // Su iOS, a volte è necessario forzare la visibilità
+        img.setAttribute("style", "visibility: visible !important; opacity: 1 !important;");
+        
+        // Assicurati che il link all'immagine sia corretto e completo (data URL)
+        const href = img.getAttribute("href") || img.getAttribute("xlink:href");
+        if (href) {
+          // Se è già un data URL, mantienilo, altrimenti potrebbe essere necessario aggiustarlo
+          img.setAttribute("xlink:href", href);
+          img.setAttribute("href", href);
+        }
+      });
+  
+      // Rimuovi opacità da tutti gli elementi per evitare problemi su iOS
+      Array.from(svgClone.querySelectorAll("*")).forEach(el => {
+        el.style.opacity = "1";
+        // Rimuovi eventuali filtri che potrebbero causare problemi su iOS
+        el.removeAttribute("filter");
+      });
+  
       const svgData = new XMLSerializer().serializeToString(svgClone);
-
+  
       // Dimensioni e posizione del QR code nel canvas
       const qrSizeOnCanvas = 780; // Aumentato
       const qrX = (baseCanvasWidth - qrSizeOnCanvas) / 2;
       const qrY = 60; // Spostato un po' più in alto
-
+  
       await new Promise((resolve, reject) => {
         const img = new Image();
-        // Per SVG molto complessi o con stili esterni, `img.src = 'data:image/svg+xml,...'` può avere problemi.
-        // `qr-code-styling` produce SVG inline, quindi dovrebbe andare bene.
-        img.src = `data:image/svg+xml;base64,${btoa(unescape(encodeURIComponent(svgData)))}`;
+        img.crossOrigin = "anonymous"; // Importante per iOS
+        
+        // Utilizzo di un nuovo approccio per caricare l'SVG in iOS
+        const svgBlob = new Blob([svgData], { type: "image/svg+xml;charset=utf-8" });
+        const svgUrl = URL.createObjectURL(svgBlob);
+        
         img.onload = () => {
           ctx.imageSmoothingEnabled = false; // Per bordi QR nitidi
           ctx.drawImage(img, qrX, qrY, qrSizeOnCanvas, qrSizeOnCanvas);
+          
+          // Rendering aggiuntivo per iOS
           if (isIOS) {
+            // Su iOS, duplica il rendering con effetti che aiutano la visibilità
             Object.assign(ctx, {
               shadowColor: fgColor,
               shadowBlur: 0.5,
@@ -425,31 +462,47 @@ export default function Home() {
               shadowOffsetY: 0,
               globalCompositeOperation: "source-over",
             });
-            ctx.drawImage(img, qrX, qrY, qrSizeOnCanvas, qrSizeOnCanvas); // Secondo passaggio per iOS
+            ctx.drawImage(img, qrX, qrY, qrSizeOnCanvas, qrSizeOnCanvas);
+            
+            // Terzo passaggio specifico per elementi interni se necessario
+            if (type === "social" && imageElements.length > 0) {
+              ctx.globalAlpha = 1;
+              ctx.shadowBlur = 0;
+              ctx.drawImage(img, qrX, qrY, qrSizeOnCanvas, qrSizeOnCanvas);
+            }
+            
             ctx.shadowBlur = 0; // Reset shadow
+            ctx.globalAlpha = 1; // Reset alpha
           }
+          
           ctx.imageSmoothingEnabled = true; // Riabilita per altro contenuto
+          // Rilascia l'URL object
+          URL.revokeObjectURL(svgUrl);
           resolve();
         };
+        
         img.onerror = (e) => {
           console.error("Image load error for QR SVG:", e);
+          URL.revokeObjectURL(svgUrl);
           reject(e);
         };
+        
+        img.src = svgUrl;
       });
-
+  
       // 6. Icona social e username SOTTO il QR code
       if (type === "social" && username) {
         const tagY = baseCanvasHeight * 0.83; // Posizione Y del tag
         const iconSizeInPdf = 90; // 6. Ingrandita l'icona
         const usernameFontSize = 60; // 6. Ingrandito il font per username
-
+  
         const IconComponent = {
           instagram: FaInstagram,
           facebook: FaFacebookF,
           linkedin: FaLinkedin,
           tiktok: FaTiktok,
         }[selectedSocial];
-
+  
         if (IconComponent) {
           // Renderizza l'icona React con il fgColor del QR per coerenza di stile
           const iconMarkup = ReactDOMServer.renderToStaticMarkup(
@@ -457,7 +510,7 @@ export default function Home() {
               <IconComponent />
             </div>,
           );
-
+  
           const tempDiv = document.createElement("div");
           Object.assign(tempDiv.style, {
             position: "fixed",
@@ -472,34 +525,35 @@ export default function Home() {
           });
           tempDiv.innerHTML = iconMarkup;
           document.body.appendChild(tempDiv);
-
+  
           try {
+            // Per iOS, usa un fattore di scala più alto
             const iconCanvas = await html2canvas(tempDiv, {
               backgroundColor: null,
-              scale: 3, // Scala alta per html2canvas
+              scale: isIOS ? 4 : 3, // Scala più alta per iOS
               useCORS: true,
               logging: false,
             });
-
+  
             const iconImage = new Image();
             iconImage.src = iconCanvas.toDataURL("image/png", 1.0); // Massima qualità PNG
-
+  
             await new Promise((res, rej) => {
               iconImage.onload = () => {
                 ctx.font = `bold ${usernameFontSize}px sans-serif`;
                 ctx.fillStyle = fgColor; // Colore del testo uguale a fgColor del QR
                 ctx.textAlign = "left";
                 ctx.textBaseline = "middle";
-
+  
                 const text = `@${username}`;
                 const textMetrics = ctx.measureText(text);
                 const textWidth = textMetrics.width;
                 const spacing = 15; // Spazio tra icona e testo
                 const totalWidth = iconSizeInPdf + spacing + textWidth;
-
+  
                 const currentIconX = (baseCanvasWidth - totalWidth) / 2;
                 const currentIconY = tagY - iconSizeInPdf / 2;
-
+  
                 // Disegna l'icona (già colorata correttamente da html2canvas)
                 ctx.drawImage(
                   iconImage,
@@ -508,7 +562,7 @@ export default function Home() {
                   iconSizeInPdf,
                   iconSizeInPdf,
                 );
-
+  
                 // Testo accanto all'icona
                 ctx.fillText(
                   text,
@@ -529,41 +583,41 @@ export default function Home() {
           }
         }
       }
-
+  
       // Footer "QRastic!" nel PDF
       ctx.font = `bold ${32}px sans-serif`; // Dimensione aumentata
       ctx.fillStyle = "#4A4A4A"; // Grigio scuro per il brand
       ctx.textAlign = "center";
       ctx.textBaseline = "bottom";
       ctx.fillText("QRastic!", baseCanvasWidth / 2, baseCanvasHeight - 25); // Posizione adattata
-
+  
       // Usa JPEG con qualità molto alta per il PDF. PNG sarebbe troppo grande.
       const imageDataUrl = canvas.toDataURL("image/jpeg", 0.98); // 0.98 è alta qualità
-
+  
       const pdf = new jsPDF({
         orientation: "portrait",
         unit: "mm",
         format: "a4", // Usa un formato standard
         compress: true,
       });
-
+  
       const pdfPageWidth = pdf.internal.pageSize.getWidth();
       const pdfPageHeight = pdf.internal.pageSize.getHeight();
-
+  
       // Mantieni le proporzioni dell'immagine del canvas
       const aspectRatio = baseCanvasWidth / baseCanvasHeight;
       let imgWidthInPdf = pdfPageWidth * 0.9; // Usa 90% della larghezza pagina
       let imgHeightInPdf = imgWidthInPdf / aspectRatio;
-
+  
       if (imgHeightInPdf > pdfPageHeight * 0.95) {
         // Se l'altezza eccede, ricalcola basandoti sull'altezza
         imgHeightInPdf = pdfPageHeight * 0.95;
         imgWidthInPdf = imgHeightInPdf * aspectRatio;
       }
-
+  
       const pdfMarginX = (pdfPageWidth - imgWidthInPdf) / 2;
       const pdfMarginY = (pdfPageHeight - imgHeightInPdf) / 2;
-
+  
       pdf.addImage(
         imageDataUrl,
         "JPEG",
