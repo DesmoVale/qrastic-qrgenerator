@@ -5,6 +5,7 @@ import QRCodeStyling from "qr-code-styling";
 import html2canvas from "html2canvas";
 import ReactDOMServer from "react-dom/server";
 import jsPDF from "jspdf";
+import Image from 'next/image';
 
 import {
   FaInstagram,
@@ -117,9 +118,18 @@ const Header = ({ siteTitle, onMenuToggle }) => {
         >
           <FaBars size={24} />
         </button>
-        <div className="text-2xl font-bold tracking-tight flex-grow text-center md:text-left pl-10 md:pl-0">
+
+        <div className="flex items-center text-2xl font-bold tracking-tight flex-grow text-center md:text-left pl-10 md:pl-0">
+          <Image
+            src="/QRastic___2_-removebg-preview.png"
+            alt="Logo QRastic"
+            width={40}
+            height={40}
+            className="mr-2"
+          />
           {siteTitle}
         </div>
+
         <nav className="hidden md:flex space-x-6 items-center">
           <a href="#" className="hover:text-gray-300 transition-colors">
             Home
@@ -137,6 +147,7 @@ const Header = ({ siteTitle, onMenuToggle }) => {
             Licenses
           </a>
         </nav>
+
         <div className="w-10 md:hidden"></div>
       </div>
     </header>
