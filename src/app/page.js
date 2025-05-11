@@ -161,7 +161,7 @@ const SidebarMenu = ({ isOpen, onClose }) => {
     {
       name: "Cookies",
       icon: <FaCookieBite className="mr-3" />,
-      href: "cookies",
+      href: "#cookies",
     },
   ];
   return (
