@@ -158,6 +158,11 @@ const SidebarMenu = ({ isOpen, onClose }) => {
     { name: "Home", icon: <FaHome className="mr-3" />, href: "#" },
     { name: "About", icon: <FaInfoCircle className="mr-3" />, href: "#about" },
     {
+      name: "Cookies",
+      icon: <FaCookieBite className="mr-3" />,
+      href: "#cookies",
+    },
+    {
       name: "Support Me",
       icon: <FaHeart className="mr-3" />,
       href: "#support",
@@ -166,11 +171,6 @@ const SidebarMenu = ({ isOpen, onClose }) => {
       name: "Licenses",
       icon: <FaBalanceScale className="mr-3" />,
       href: "#licenses",
-    },
-    {
-      name: "Cookies",
-      icon: <FaCookieBite className="mr-3" />,
-      href: "#cookies",
     },
   ];
   return (
