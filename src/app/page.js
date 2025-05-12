@@ -120,10 +120,10 @@ const Header = ({ siteTitle, onMenuToggle }) => {
 
         <div className="flex items-center text-2xl font-bold tracking-tight flex-grow text-center md:text-left pl-10 md:pl-0">
           <img
-            src="/QRastic___2_-removebg-preview.png"
+            src="/favicon.png"
             alt="Logo QRastic"
-            width="40"
-            height="40"
+            width="90"
+            height="90"
             className="mr-2"
           />
           {siteTitle}
