@@ -794,6 +794,8 @@ export default function Home() {
       <main
         className={`p-4 md:p-8 transition-transform duration-300 ease-in-out ${isMenuOpen ? "blur-sm md:blur-none pointer-events-none md:pointer-events-auto" : ""}`}
       >
+        <h1 className="text-3xl sm:text-4xl md:text-5xl font-semibold text-center my-8 md:my-12">QRastic - generate free high quality QR codes</h1>
+      
         <div className="max-w-6xl mx-auto">
           <div className="flex flex-col lg:flex-row gap-6 md:gap-8">
             <div className="lg:w-2/5 bg-gray-900 p-5 md:p-6 rounded-xl shadow-xl space-y-5 ring-1 ring-gray-700">
